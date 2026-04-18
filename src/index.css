@@ -6,7 +6,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-    --font-heading: var(--font-sans);
+    --font-heading: var(--font-display);
     --font-sans: 'Geist Variable', sans-serif;
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
@@ -49,38 +49,39 @@
 }
 
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
+    --font-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+    --background: oklch(0.985 0.004 84);
+    --foreground: oklch(0.19 0.008 84);
+    --card: oklch(0.972 0.003 84);
+    --card-foreground: oklch(0.19 0.008 84);
+    --popover: oklch(0.985 0.004 84);
+    --popover-foreground: oklch(0.19 0.008 84);
+    --primary: oklch(0.21 0.012 84);
+    --primary-foreground: oklch(0.985 0.004 84);
+    --secondary: oklch(0.95 0.004 84);
+    --secondary-foreground: oklch(0.21 0.012 84);
+    --muted: oklch(0.945 0.003 84);
+    --muted-foreground: oklch(0.46 0.008 84);
+    --accent: oklch(0.77 0.028 76);
+    --accent-foreground: oklch(0.18 0.012 84);
     --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
+    --border: oklch(0.88 0.004 84);
+    --input: oklch(0.88 0.004 84);
+    --ring: oklch(0.72 0.024 76);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
     --chart-4: oklch(0.371 0 0);
     --chart-5: oklch(0.269 0 0);
-    --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+    --radius: 1.5rem;
+    --sidebar: oklch(0.972 0.003 84);
+    --sidebar-foreground: oklch(0.19 0.008 84);
+    --sidebar-primary: oklch(0.21 0.012 84);
+    --sidebar-primary-foreground: oklch(0.985 0.004 84);
+    --sidebar-accent: oklch(0.95 0.004 84);
+    --sidebar-accent-foreground: oklch(0.21 0.012 84);
+    --sidebar-border: oklch(0.88 0.004 84);
+    --sidebar-ring: oklch(0.72 0.024 76);
 }
 
 .dark {
@@ -120,11 +121,65 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    }
-  body {
-    @apply bg-background text-foreground;
-    }
+  }
   html {
     @apply font-sans;
-    }
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-background text-foreground;
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at top, oklch(0.99 0.01 84), transparent 32%),
+      linear-gradient(180deg, oklch(0.985 0.004 84), oklch(0.965 0.004 84));
+    text-rendering: optimizeLegibility;
+  }
+  #root {
+    min-height: 100vh;
+  }
+  button {
+    cursor: pointer;
+  }
+  img {
+    display: block;
+  }
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility eyebrow-label {
+  color: color-mix(in oklab, var(--muted-foreground) 88%, white 12%);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  line-height: 1;
+}
+
+@utility surface-chip {
+  border: 1px solid color-mix(in oklab, var(--border) 88%, white 12%);
+  background: color-mix(in oklab, var(--background) 82%, white 18%);
+  border-radius: 9999px;
+  color: color-mix(in oklab, var(--muted-foreground) 90%, white 10%);
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 0.85rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+}
+
+@utility tag-chip-muted {
+  border: 1px solid color-mix(in oklab, var(--border) 85%, white 15%);
+  background: color-mix(in oklab, var(--card) 82%, white 18%);
+  border-radius: 9999px;
+  color: color-mix(in oklab, var(--muted-foreground) 90%, white 10%);
+  display: inline-flex;
+  align-items: center;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.78rem;
+  line-height: 1;
 }

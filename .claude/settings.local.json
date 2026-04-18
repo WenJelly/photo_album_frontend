@@ -10,7 +10,11 @@
       "Bash(cp \"D:/Development Tools/Project/Frontend-Projects/photo-temp/\".* \"D:/Development Tools/Project/Frontend-Projects/photo/\")",
       "Bash(rm -rf \"D:/Development Tools/Project/Frontend-Projects/photo-temp\")",
       "Bash(npm install *)",
-      "Bash(npx shadcn@latest init -d -y)"
+      "Bash(npx shadcn@latest init -d -y)",
+      "Bash(npm run *)",
+      "Bash(bash *)",
+      "Bash(npx tsc *)",
+      "Bash(npx vite *)"
     ]
   }
 }

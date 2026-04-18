@@ -1,120 +1,126 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useEffect, useLayoutEffect, useMemo, useState } from "react"
+
+import { CategoryFilter } from "@/components/CategoryFilter"
+import { AuthDialog } from "@/components/AuthDialog"
+import { ExhibitionHeader } from "@/components/ExhibitionHeader"
+import { HeroIntro } from "@/components/HeroIntro"
+import { PhotoGrid } from "@/components/PhotoGrid"
+import { PhotoPreviewOverlay } from "@/components/PhotoPreviewOverlay"
+import { photos, type Category } from "@/data/photos"
+import type { Photo } from "@/types/photo"
+import { cn } from "@/lib/utils"
+
+type Page = "home" | "gallery"
+
+const GALLERY_PATH = "/gallery"
+
+function getPageFromPathname(pathname: string): Page {
+  const normalizedPathname = pathname.replace(/\/+$/, "") || "/"
+
+  return normalizedPathname === GALLERY_PATH ? "gallery" : "home"
+}
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [currentPage, setCurrentPage] = useState<Page>(() => getPageFromPathname(window.location.pathname))
+  const [activeCategory, setActiveCategory] = useState<Category>("all")
+  const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false)
+  const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null)
+
+  const filteredPhotos = useMemo(
+    () => (activeCategory === "all" ? photos : photos.filter((photo) => photo.category === activeCategory)),
+    [activeCategory]
+  )
+  const selectedPhoto = useMemo(
+    () => filteredPhotos.find((photo) => photo.id === selectedPhotoId) ?? null,
+    [filteredPhotos, selectedPhotoId]
+  )
+
+  const isHome = currentPage === "home"
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setIsAuthDialogOpen(false)
+      setSelectedPhotoId(null)
+      const nextPage = getPageFromPathname(window.location.pathname)
+
+      if (nextPage === "home") {
+        window.scrollTo({ top: 0, behavior: "auto" })
+      }
+
+      setCurrentPage(nextPage)
+    }
+
+    window.addEventListener("popstate", handlePopState)
+
+    return () => window.removeEventListener("popstate", handlePopState)
+  }, [])
+
+  useLayoutEffect(() => {
+    document.documentElement.style.scrollbarGutter = isHome ? "" : "stable both-edges"
+
+    return () => {
+      document.documentElement.style.scrollbarGutter = ""
+    }
+  }, [isHome])
+
+  const navigateTo = (page: Page) => {
+    const nextPath = page === "gallery" ? GALLERY_PATH : "/"
+
+    if (window.location.pathname !== nextPath) {
+      window.history.pushState({}, "", nextPath)
+    }
+
+    setIsAuthDialogOpen(false)
+    setSelectedPhotoId(null)
+    if (page === "home") {
+      window.scrollTo({ top: 0, behavior: "auto" })
+    }
+    setCurrentPage(page)
+  }
+
+  const openHome = () => navigateTo("home")
+  const openGallery = () => navigateTo("gallery")
+  const clearFilter = () => setActiveCategory("all")
+  const handlePhotoClick = (photo: Photo) => setSelectedPhotoId(photo.id)
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+    <div
+      data-testid="app-shell"
+      className={cn(
+        "flex flex-col bg-background text-foreground",
+        isHome ? "relative h-screen overflow-hidden" : "min-h-screen"
+      )}
+    >
+      <ExhibitionHeader
+        currentPage={currentPage}
+        onHomeClick={openHome}
+        onGalleryClick={openGallery}
+        onLoginClick={() => setIsAuthDialogOpen(true)}
+      />
+      <main className={cn("flex-1", isHome && "min-h-0")}>
+        {isHome ? (
+          <HeroIntro />
+        ) : (
+          <section className="mx-auto max-w-[1440px] px-4 pb-10 pt-4 md:px-6 md:pb-16 md:pt-6">
+            <div className="mb-4">
+              <CategoryFilter active={activeCategory} onChange={setActiveCategory} />
+            </div>
+            <PhotoGrid photos={filteredPhotos} onPhotoClick={handlePhotoClick} onClearFilter={clearFilter} />
+          </section>
+        )}
+      </main>
+      {isAuthDialogOpen ? (
+        <AuthDialog open={isAuthDialogOpen} onClose={() => setIsAuthDialogOpen(false)} />
+      ) : null}
+      {currentPage === "gallery" && selectedPhoto ? (
+        <PhotoPreviewOverlay
+          photo={selectedPhoto}
+          photos={filteredPhotos}
+          onClose={() => setSelectedPhotoId(null)}
+          onSelect={(photo) => setSelectedPhotoId(photo.id)}
+        />
+      ) : null}
+    </div>
   )
 }
 
