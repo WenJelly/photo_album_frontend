@@ -1,3 +1,6 @@
+import { LogOut, User } from "lucide-react"
+
+import { useAuth } from "@/contexts/auth-context"
 import { cn } from "@/lib/utils"
 
 interface ExhibitionHeaderProps {
@@ -5,6 +8,7 @@ interface ExhibitionHeaderProps {
   onHomeClick: () => void
   onGalleryClick: () => void
   onLoginClick: () => void
+  onUploadClick: () => void
 }
 
 export function ExhibitionHeader({
@@ -12,8 +16,11 @@ export function ExhibitionHeader({
   onHomeClick,
   onGalleryClick,
   onLoginClick,
+  onUploadClick,
 }: ExhibitionHeaderProps) {
+  const { user, isLoggedIn, logout } = useAuth()
   const isHome = currentPage === "home"
+  const showUploadAction = isLoggedIn && currentPage === "gallery"
   const navItemClass = (isActive: boolean) =>
     cn(
       "rounded-none px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
@@ -23,16 +30,14 @@ export function ExhibitionHeader({
           : "text-white/78 hover:text-white"
         : isActive
           ? "text-foreground"
-          : "text-foreground/68 hover:text-foreground"
+          : "text-foreground/68 hover:text-foreground",
     )
 
   return (
     <header
       className={cn(
         "inset-x-0 top-0 z-40 border-b border-white/22 shadow-[0_12px_36px_rgba(15,23,42,0.06)] backdrop-blur-2xl",
-        isHome
-          ? "absolute bg-white/18"
-          : "sticky bg-white/55"
+        isHome ? "absolute bg-white/18" : "sticky bg-white/55",
       )}
     >
       <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-5 py-4 md:px-8">
@@ -41,7 +46,7 @@ export function ExhibitionHeader({
           <h1
             className={cn(
               "font-heading text-[1.55rem] font-semibold leading-none tracking-[-0.03em]",
-              isHome ? "text-white" : "text-foreground"
+              isHome ? "text-white" : "text-foreground",
             )}
           >
             WenJelly
@@ -64,18 +69,59 @@ export function ExhibitionHeader({
           >
             图库
           </button>
-          <button
-            type="button"
-            onClick={onLoginClick}
-            className={cn(
-              "rounded-md border px-4 py-2 text-sm font-medium shadow-[0_8px_24px_rgba(15,23,42,0.06)] backdrop-blur-md transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-              isHome
-                ? "border-white/28 bg-white/14 text-white hover:bg-white/22"
-                : "border-white/60 bg-white/72 text-foreground hover:bg-white/88"
-            )}
-          >
-            登录
-          </button>
+          {isLoggedIn ? (
+            <div className="flex items-center gap-2">
+              {showUploadAction ? (
+                <button
+                  type="button"
+                  data-testid="open-upload-dialog"
+                  onClick={onUploadClick}
+                  className="rounded-md border border-white/60 bg-white/78 px-4 py-2 text-sm font-medium text-foreground shadow-[0_8px_24px_rgba(15,23,42,0.06)] backdrop-blur-md transition hover:bg-white"
+                >
+                  上传
+                </button>
+              ) : null}
+              <div
+                className={cn(
+                  "flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm backdrop-blur-md",
+                  isHome
+                    ? "border-white/28 bg-white/14 text-white"
+                    : "border-white/60 bg-white/72 text-foreground",
+                )}
+              >
+                {user?.userAvatar ? (
+                  <img src={user.userAvatar} alt="" className="size-6 rounded-full object-cover" />
+                ) : (
+                  <User className="size-4" />
+                )}
+                <span className="max-w-[8ch] truncate font-medium">{user?.userName}</span>
+              </div>
+              <button
+                type="button"
+                onClick={logout}
+                className={cn(
+                  "rounded-md p-2 transition",
+                  isHome ? "text-white/70 hover:text-white" : "text-foreground/60 hover:text-foreground",
+                )}
+                aria-label="退出登录"
+              >
+                <LogOut className="size-4" />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onLoginClick}
+              className={cn(
+                "rounded-md border px-4 py-2 text-sm font-medium shadow-[0_8px_24px_rgba(15,23,42,0.06)] backdrop-blur-md transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                isHome
+                  ? "border-white/28 bg-white/14 text-white hover:bg-white/22"
+                  : "border-white/60 bg-white/72 text-foreground hover:bg-white/88",
+              )}
+            >
+              登录
+            </button>
+          )}
         </nav>
       </div>
     </header>

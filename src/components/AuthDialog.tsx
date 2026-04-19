@@ -1,11 +1,13 @@
-import { useLayoutEffect, useRef, useState, type FormEvent } from "react"
+import { useLayoutEffect, useRef, useState, type FormEvent, type MouseEvent } from "react"
 import { X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { login as loginApi, register as registerApi } from "@/lib/auth-api"
+import { useAuth } from "@/contexts/auth-context"
 
 type AuthMode = "login" | "register"
-type SubmitState = "idle" | "submitting" | "register-success"
+type SubmitState = "idle" | "submitting" | "register-success" | "error"
 
 interface AuthDialogProps {
   open: boolean
@@ -35,38 +37,35 @@ interface FieldProps {
 }
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const SUBMIT_DELAY_MS = 650
 
 const COPY = {
-  backToLogin: "\u53bb\u767b\u5f55",
-  closeLabel: "\u5173\u95ed\u767b\u5f55\u5361\u7247",
-  confirmPassword: "\u786e\u8ba4\u5bc6\u7801",
-  confirmPasswordRequired: "\u8bf7\u786e\u8ba4\u5bc6\u7801",
-  email: "\u90ae\u7bb1",
-  emailInvalid: "\u8bf7\u8f93\u5165\u6709\u6548\u7684\u90ae\u7bb1\u5730\u5740",
-  emailRequired: "\u8bf7\u8f93\u5165\u90ae\u7bb1",
-  forgotPassword: "\u5fd8\u8bb0\u5bc6\u7801?",
-  hasAccount: "\u5df2\u6709\u8d26\u53f7?",
-  loginDescription:
-    "\u4f7f\u7528\u90ae\u7bb1\u548c\u5bc6\u7801\u8bbf\u95ee\u4f60\u7684\u56fe\u5e93\u4e0e\u540e\u7eed\u4e0a\u4f20\u80fd\u529b\u3002",
-  loginSubmit: "\u767b\u5f55",
-  loginSubmitting: "\u767b\u5f55\u4e2d...",
-  loginTitle: "\u767b\u5f55",
-  noAccount: "\u6ca1\u6709\u8d26\u53f7?",
-  password: "\u5bc6\u7801",
-  passwordMismatch: "\u4e24\u6b21\u8f93\u5165\u7684\u5bc6\u7801\u4e0d\u4e00\u81f4",
-  passwordRequired: "\u8bf7\u8f93\u5165\u5bc6\u7801",
-  registerDescription:
-    "\u4f7f\u7528\u90ae\u7bb1\u521b\u5efa\u4f60\u7684\u5e10\u53f7\uff0c\u540e\u7eed\u53ef\u7528\u4e8e\u7ba1\u7406\u56fe\u5e93\u4e0e\u4e0a\u4f20\u5185\u5bb9\u3002",
-  registerSubmit: "\u6ce8\u518c",
-  registerSubmitting: "\u6ce8\u518c\u4e2d...",
-  registerSuccess: "\u6ce8\u518c\u6210\u529f",
-  registerSuccessAlert:
-    "\u6ce8\u518c\u6210\u529f\uff0c\u63a5\u4e0b\u6765\u4f7f\u7528\u521a\u624d\u586b\u5199\u7684\u90ae\u7bb1\u4e0e\u5bc6\u7801\u767b\u5f55\u5373\u53ef\u3002",
-  registerSuccessDescription:
-    "\u8d26\u53f7\u5df2\u521b\u5efa\u5b8c\u6210\uff0c\u73b0\u5728\u53ef\u4ee5\u56de\u5230\u767b\u5f55\u7ee7\u7eed\u4f7f\u7528\u3002",
-  successEyebrow: "\u8d26\u53f7\u5df2\u521b\u5efa",
-  switchEyebrow: "\u8d26\u53f7\u5165\u53e3",
+  backToLogin: "去登录",
+  closeLabel: "关闭登录卡片",
+  confirmPassword: "确认密码",
+  confirmPasswordRequired: "请确认密码",
+  email: "邮箱",
+  emailInvalid: "请输入有效的邮箱地址",
+  emailRequired: "请输入邮箱",
+  forgotPassword: "忘记密码?",
+  hasAccount: "已有账号?",
+  loginDescription: "使用邮箱和密码访问你的图库与后续上传能力。",
+  loginFailed: "登录失败，请检查邮箱和密码",
+  loginSubmit: "登录",
+  loginSubmitting: "登录中...",
+  loginTitle: "登录",
+  noAccount: "没有账号?",
+  password: "密码",
+  passwordMismatch: "两次输入的密码不一致",
+  passwordRequired: "请输入密码",
+  registerDescription: "使用邮箱创建你的帐号，后续可用于管理图库与上传内容。",
+  registerFailed: "注册失败，该邮箱可能已被注册",
+  registerSubmit: "注册",
+  registerSubmitting: "注册中...",
+  registerSuccess: "注册成功",
+  registerSuccessAlert: "注册成功，接下来使用刚才填写的邮箱与密码登录即可。",
+  registerSuccessDescription: "账号已创建完成，现在可以回到登录继续使用。",
+  successEyebrow: "账号已创建",
+  switchEyebrow: "账号入口",
 } as const
 
 const INITIAL_FIELDS: AuthFields = {
@@ -77,10 +76,14 @@ const INITIAL_FIELDS: AuthFields = {
 
 export function AuthDialog({ open, onClose }: AuthDialogProps) {
   const timeoutRef = useRef<number | null>(null)
+  const shouldCloseFromBackdropRef = useRef(false)
   const [mode, setMode] = useState<AuthMode>("login")
   const [fields, setFields] = useState<AuthFields>(INITIAL_FIELDS)
   const [errors, setErrors] = useState<FieldErrors>({})
   const [submitState, setSubmitState] = useState<SubmitState>("idle")
+  const [apiError, setApiError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const { login: onLoginSuccess } = useAuth()
 
   const title =
     submitState === "register-success"
@@ -108,6 +111,8 @@ export function AuthDialog({ open, onClose }: AuthDialogProps) {
   const resetFieldsForMode = () => {
     setErrors({})
     setSubmitState("idle")
+    setApiError(null)
+    setSuccessMessage(null)
     setFields((current) => ({
       confirmPassword: "",
       email: current.email,
@@ -199,24 +204,60 @@ export function AuthDialog({ open, onClose }: AuthDialogProps) {
     }
 
     clearPendingTimeout()
+    setApiError(null)
+    setSuccessMessage(null)
     setSubmitState("submitting")
-    timeoutRef.current = window.setTimeout(() => {
-      timeoutRef.current = null
 
-      if (mode === "login") {
-        onClose()
-        return
-      }
+    const email = fields.email.trim()
 
-      setSubmitState("register-success")
-    }, SUBMIT_DELAY_MS)
+    if (mode === "login") {
+      loginApi({ userEmail: email, userPassword: fields.password })
+        .then((result) => {
+          onLoginSuccess(result.data)
+          onClose()
+        })
+        .catch((err: unknown) => {
+          setSubmitState("error")
+          setApiError(err instanceof Error ? err.message : COPY.loginFailed)
+        })
+    } else {
+      registerApi({
+        userEmail: email,
+        userPassword: fields.password,
+        userCheckPassword: fields.confirmPassword,
+      })
+        .then((result) => {
+          setSuccessMessage(result.message || COPY.registerSuccessAlert)
+          setSubmitState("register-success")
+        })
+        .catch((err: unknown) => {
+          setSubmitState("error")
+          setApiError(err instanceof Error ? err.message : COPY.registerFailed)
+        })
+    }
+  }
+
+  const handleBackdropMouseDown = (event: MouseEvent<HTMLDivElement>) => {
+    shouldCloseFromBackdropRef.current = event.target === event.currentTarget
+  }
+
+  const handleBackdropClick = (event: MouseEvent<HTMLDivElement>) => {
+    const shouldClose =
+      shouldCloseFromBackdropRef.current && event.target === event.currentTarget
+
+    shouldCloseFromBackdropRef.current = false
+
+    if (shouldClose) {
+      onClose()
+    }
   }
 
   return (
     <div
       data-testid="auth-backdrop"
       className="fixed inset-0 z-[70] bg-[rgba(17,17,19,0.42)] backdrop-blur-[14px]"
-      onClick={onClose}
+      onMouseDown={handleBackdropMouseDown}
+      onClick={handleBackdropClick}
     >
       <div className="flex min-h-screen items-center justify-center p-4 md:p-6">
         <div
@@ -245,7 +286,7 @@ export function AuthDialog({ open, onClose }: AuthDialogProps) {
           {submitState === "register-success" ? (
             <div className="mt-8 space-y-4">
               <div className="rounded-[1.4rem] border border-emerald-500/18 bg-emerald-500/8 px-4 py-3 text-sm text-emerald-950/88">
-                {COPY.registerSuccessAlert}
+                {successMessage ?? COPY.registerSuccessAlert}
               </div>
               <Button className="h-11 w-full rounded-2xl" onClick={resetToLogin}>
                 {COPY.backToLogin}
@@ -291,6 +332,11 @@ export function AuthDialog({ open, onClose }: AuthDialogProps) {
                   autoComplete="new-password"
                   onChange={(value) => setField("confirmPassword", value)}
                 />
+              ) : null}
+              {apiError ? (
+                <div className="rounded-[1.4rem] border border-destructive/25 bg-destructive/8 px-4 py-3 text-sm text-destructive">
+                  {apiError}
+                </div>
               ) : null}
               <Button
                 type="submit"

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { categoryLabels } from "@/data/photos"
 import { PHOTO_DETAIL_TAG_LIMIT, getTagDisplay } from "@/lib/photo-tags"
 import type { Photo } from "@/types/photo"
 
@@ -11,12 +10,14 @@ interface PhotoPreviewOverlayProps {
   photos: Photo[]
   onClose: () => void
   onSelect: (photo: Photo) => void
+  isLoading?: boolean
+  errorMessage?: string | null
 }
 
 const DESKTOP_BREAKPOINT = 768
 
-function getPreviewSrc(src: string) {
-  return src.replace("w=800", "w=1600")
+function getPreviewSrc(photo: Photo) {
+  return photo.src
 }
 
 export function PhotoPreviewOverlay({
@@ -24,18 +25,20 @@ export function PhotoPreviewOverlay({
   photos,
   onClose,
   onSelect,
+  isLoading = false,
+  errorMessage = null,
 }: PhotoPreviewOverlayProps) {
   const imageRef = useRef<HTMLImageElement | null>(null)
   const [imageHeight, setImageHeight] = useState(0)
   const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= DESKTOP_BREAKPOINT)
   const [isEntered, setIsEntered] = useState(false)
 
-  const currentIndex = useMemo(
-    () => photos.findIndex((item) => item.id === photo.id),
-    [photo.id, photos]
-  )
+  const currentIndex = useMemo(() => photos.findIndex((item) => item.id === photo.id), [photo.id, photos])
   const previousPhoto = currentIndex > 0 ? photos[currentIndex - 1] : null
   const nextPhoto = currentIndex >= 0 && currentIndex < photos.length - 1 ? photos[currentIndex + 1] : null
+  const previewSrc = getPreviewSrc(photo)
+  const categoryLabel = photo.categoryLabel ?? photo.category
+  const { visibleTags, hiddenCount } = getTagDisplay(photo.tags, { maxVisible: PHOTO_DETAIL_TAG_LIMIT })
 
   useEffect(() => {
     const handleResize = () => {
@@ -55,7 +58,9 @@ export function PhotoPreviewOverlay({
 
   useEffect(() => {
     const measureImageHeight = () => {
-      if (!imageRef.current) return
+      if (!imageRef.current) {
+        return
+      }
 
       const nextHeight = imageRef.current.getBoundingClientRect().height
       setImageHeight(nextHeight > 0 ? Math.round(nextHeight) : 0)
@@ -78,9 +83,15 @@ export function PhotoPreviewOverlay({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose()
-      if (event.key === "ArrowLeft" && previousPhoto) onSelect(previousPhoto)
-      if (event.key === "ArrowRight" && nextPhoto) onSelect(nextPhoto)
+      if (event.key === "Escape") {
+        onClose()
+      }
+      if (event.key === "ArrowLeft" && previousPhoto) {
+        onSelect(previousPhoto)
+      }
+      if (event.key === "ArrowRight" && nextPhoto) {
+        onSelect(nextPhoto)
+      }
     }
 
     const previousOverflow = document.body.style.overflow
@@ -99,9 +110,6 @@ export function PhotoPreviewOverlay({
       document.body.style.paddingRight = previousPaddingRight
     }
   }, [nextPhoto, onClose, onSelect, previousPhoto])
-
-  const previewSrc = getPreviewSrc(photo.src)
-  const { visibleTags, hiddenCount } = getTagDisplay(photo.tags, { maxVisible: PHOTO_DETAIL_TAG_LIMIT })
 
   return (
     <div
@@ -130,6 +138,7 @@ export function PhotoPreviewOverlay({
               {isDesktop ? (
                 <button
                   type="button"
+                  data-testid="preview-prev"
                   aria-label="上一张图片"
                   onClick={() => previousPhoto && onSelect(previousPhoto)}
                   disabled={!previousPhoto}
@@ -141,6 +150,7 @@ export function PhotoPreviewOverlay({
               {isDesktop ? (
                 <button
                   type="button"
+                  data-testid="preview-next"
                   aria-label="下一张图片"
                   onClick={() => nextPhoto && onSelect(nextPhoto)}
                   disabled={!nextPhoto}
@@ -161,6 +171,7 @@ export function PhotoPreviewOverlay({
               />
             </div>
             <aside
+              role="complementary"
               className="flex w-full shrink-0 flex-col justify-between overflow-y-auto border-t border-black/10 bg-white p-6 text-neutral-950 md:w-[360px] md:border-l md:border-t-0 md:p-8"
               style={isDesktop && imageHeight ? { height: `${imageHeight}px` } : undefined}
             >
@@ -171,7 +182,7 @@ export function PhotoPreviewOverlay({
                       当前作品
                     </span>
                     <span className="rounded-full border border-black/8 bg-neutral-950/[0.03] px-3 py-1 tracking-[0.18em]">
-                      {categoryLabels[photo.category]}
+                      {categoryLabel}
                     </span>
                     {visibleTags.map((tag) => (
                       <span
@@ -189,6 +200,11 @@ export function PhotoPreviewOverlay({
                   </div>
                   <h3 className="text-2xl font-medium tracking-[-0.04em]">{photo.alt}</h3>
                   <p className="text-sm leading-6 text-neutral-600">{photo.summary}</p>
+                  {errorMessage ? (
+                    <p className="rounded-2xl border border-amber-500/25 bg-amber-500/8 px-4 py-3 text-sm text-amber-900">
+                      {errorMessage}
+                    </p>
+                  ) : null}
                 </div>
                 <dl className="grid gap-5 text-sm text-neutral-600">
                   <div>
@@ -197,11 +213,11 @@ export function PhotoPreviewOverlay({
                   </div>
                   <div>
                     <dt className="text-[0.72rem] tracking-[0.18em] text-neutral-500">分类</dt>
-                    <dd className="mt-2 text-base text-neutral-950">{categoryLabels[photo.category]}</dd>
+                    <dd className="mt-2 text-base text-neutral-950">{categoryLabel}</dd>
                   </div>
                   <div>
-                    <dt className="text-[0.72rem] tracking-[0.18em] text-neutral-500">地点</dt>
-                    <dd className="mt-2 text-base text-neutral-950">{photo.location}</dd>
+                    <dt className="text-[0.72rem] tracking-[0.18em] text-neutral-500">格式</dt>
+                    <dd className="mt-2 text-base text-neutral-950">{photo.format ?? "-"}</dd>
                   </div>
                   <div>
                     <dt className="text-[0.72rem] tracking-[0.18em] text-neutral-500">尺寸</dt>
@@ -209,18 +225,41 @@ export function PhotoPreviewOverlay({
                       {photo.width} × {photo.height}
                     </dd>
                   </div>
+                  <div>
+                    <dt className="text-[0.72rem] tracking-[0.18em] text-neutral-500">上传时间</dt>
+                    <dd className="mt-2 text-base text-neutral-950">{photo.createdAt ?? "-"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-[0.72rem] tracking-[0.18em] text-neutral-500">浏览 / 点赞</dt>
+                    <dd className="mt-2 text-base text-neutral-950">
+                      {photo.viewCount ?? 0} / {photo.likeCount ?? 0}
+                    </dd>
+                  </div>
                 </dl>
               </div>
               <div className="mt-8 space-y-4 border-t border-black/10 pt-5">
-                <p className="text-sm text-neutral-500">
-                  {currentIndex + 1} / {photos.length}
-                </p>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm text-neutral-500">
+                    {currentIndex + 1} / {photos.length}
+                  </p>
+                  {isLoading ? <p className="text-sm text-neutral-500">正在更新详情...</p> : null}
+                </div>
                 {!isDesktop ? (
                   <div className="grid grid-cols-2 gap-3">
-                    <Button variant="secondary" onClick={() => previousPhoto && onSelect(previousPhoto)} disabled={!previousPhoto}>
+                    <Button
+                      data-testid="preview-prev-mobile"
+                      variant="secondary"
+                      onClick={() => previousPhoto && onSelect(previousPhoto)}
+                      disabled={!previousPhoto}
+                    >
                       上一张
                     </Button>
-                    <Button variant="secondary" onClick={() => nextPhoto && onSelect(nextPhoto)} disabled={!nextPhoto}>
+                    <Button
+                      data-testid="preview-next-mobile"
+                      variant="secondary"
+                      onClick={() => nextPhoto && onSelect(nextPhoto)}
+                      disabled={!nextPhoto}
+                    >
                       下一张
                     </Button>
                   </div>

@@ -98,7 +98,7 @@ function PhotoCard({
       style={{ flex: `${photo.width / photo.height} 0 0` }}
     >
       <img
-        src={photo.src}
+        src={photo.thumbnailSrc ?? photo.src}
         alt={photo.alt}
         loading="lazy"
         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.015]"

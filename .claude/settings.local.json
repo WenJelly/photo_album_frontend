@@ -14,7 +14,8 @@
       "Bash(npm run *)",
       "Bash(bash *)",
       "Bash(npx tsc *)",
-      "Bash(npx vite *)"
+      "Bash(npx vite *)",
+      "Bash(npx vitest *)"
     ]
   }
 }
