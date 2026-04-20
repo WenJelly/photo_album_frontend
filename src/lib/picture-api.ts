@@ -86,6 +86,7 @@ export interface DeletePictureResult {
 const DEFAULT_PAGE_NUM = 1
 const DEFAULT_PAGE_SIZE = 20
 const MAX_PAGE_SIZE = 20
+const UPLOAD_REQUEST_TIMEOUT = 60_000
 const FALLBACK_PHOTO_NAME = "Untitled"
 const FALLBACK_USER_NAME = "Unknown"
 const FALLBACK_CATEGORY = "uncategorized"
@@ -227,6 +228,7 @@ export async function uploadPictureFile(params: UploadPictureFileParams): Promis
     headers: {
       "Content-Type": "multipart/form-data",
     },
+    timeout: UPLOAD_REQUEST_TIMEOUT,
   })
   const result = unwrapApiResponse(data)
 
@@ -259,7 +261,9 @@ export async function uploadPictureByUrl(params: UploadPictureByUrlParams): Prom
     payload.category = category
   }
 
-  const { data } = await request.post<ApiEnvelope<BackendPicture>>("/api/picture/upload/url", payload)
+  const { data } = await request.post<ApiEnvelope<BackendPicture>>("/api/picture/upload/url", payload, {
+    timeout: UPLOAD_REQUEST_TIMEOUT,
+  })
   const result = unwrapApiResponse(data)
 
   return mapPictureToPhoto(result.data)
