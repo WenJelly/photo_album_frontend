@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { preloadImages } from "@/lib/image-preload"
 import { PHOTO_DETAIL_TAG_LIMIT, getTagDisplay } from "@/lib/photo-tags"
 import type { Photo } from "@/types/photo"
 
@@ -10,6 +11,10 @@ interface PhotoPreviewOverlayProps {
   photos: Photo[]
   onClose: () => void
   onSelect: (photo: Photo) => void
+  onDelete?: () => void
+  onPhotographerClick?: (photo: Photo) => void
+  canDelete?: boolean
+  isDeleting?: boolean
   isLoading?: boolean
   errorMessage?: string | null
 }
@@ -25,6 +30,10 @@ export function PhotoPreviewOverlay({
   photos,
   onClose,
   onSelect,
+  onDelete,
+  onPhotographerClick,
+  canDelete = false,
+  isDeleting = false,
   isLoading = false,
   errorMessage = null,
 }: PhotoPreviewOverlayProps) {
@@ -80,6 +89,10 @@ export function PhotoPreviewOverlay({
 
     return () => observer.disconnect()
   }, [photo.id, isDesktop])
+
+  useEffect(() => {
+    preloadImages([previewSrc, previousPhoto?.src, nextPhoto?.src])
+  }, [nextPhoto?.src, previousPhoto?.src, previewSrc])
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -163,6 +176,12 @@ export function PhotoPreviewOverlay({
                 ref={imageRef}
                 src={previewSrc}
                 alt={photo.alt}
+                width={photo.width}
+                height={photo.height}
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+                draggable="false"
                 onLoad={() => {
                   const nextHeight = imageRef.current?.getBoundingClientRect().height ?? 0
                   setImageHeight(nextHeight > 0 ? Math.round(nextHeight) : 0)
@@ -209,7 +228,19 @@ export function PhotoPreviewOverlay({
                 <dl className="grid gap-5 text-sm text-neutral-600">
                   <div>
                     <dt className="text-[0.72rem] tracking-[0.18em] text-neutral-500">摄影师</dt>
-                    <dd className="mt-2 text-base text-neutral-950">{photo.photographer}</dd>
+                    <dd className="mt-2 text-base text-neutral-950">
+                      {onPhotographerClick && photo.userId ? (
+                        <button
+                          type="button"
+                          onClick={() => onPhotographerClick(photo)}
+                          className="transition hover:text-neutral-700 focus-visible:outline-none focus-visible:underline"
+                        >
+                          {photo.photographer}
+                        </button>
+                      ) : (
+                        photo.photographer
+                      )}
+                    </dd>
                   </div>
                   <div>
                     <dt className="text-[0.72rem] tracking-[0.18em] text-neutral-500">分类</dt>
@@ -242,7 +273,14 @@ export function PhotoPreviewOverlay({
                   <p className="text-sm text-neutral-500">
                     {currentIndex + 1} / {photos.length}
                   </p>
-                  {isLoading ? <p className="text-sm text-neutral-500">正在更新详情...</p> : null}
+                  <div className="flex items-center gap-3">
+                    {isLoading ? <p className="text-sm text-neutral-500">正在更新详情...</p> : null}
+                    {canDelete ? (
+                      <Button variant="destructive" onClick={onDelete} disabled={isDeleting}>
+                        删除图片
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
                 {!isDesktop ? (
                   <div className="grid grid-cols-2 gap-3">

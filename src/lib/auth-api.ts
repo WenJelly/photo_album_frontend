@@ -13,7 +13,7 @@ export interface RegisterParams {
 
 export interface LoginResult {
   token: string
-  id: number
+  id: string
   userAccount: string
   userName: string
   userAvatar: string
@@ -24,7 +24,7 @@ export interface LoginResult {
 }
 
 export interface RegisterResult {
-  id: number
+  id: string
 }
 
 export type AuthActionResult<T> = ApiResult<T>

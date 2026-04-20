@@ -21,5 +21,5 @@ export interface Photo {
   updatedAt?: string
   reviewStatus?: number
   reviewMessage?: string
-  userId?: number
+  userId?: string
 }

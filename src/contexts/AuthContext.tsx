@@ -2,23 +2,18 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 
 import type { LoginResult } from "@/lib/auth-api"
 import {
+  AUTH_UNAUTHORIZED_EVENT,
   AuthContext,
   TOKEN_KEY,
   USER_KEY,
+  type AuthUser,
+  clearStoredAuth,
   readStoredUser,
   type AuthContextValue,
 } from "@/contexts/auth-context"
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState(readStoredUser)
-
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem(USER_KEY, JSON.stringify(user))
-    } else {
-      localStorage.removeItem(USER_KEY)
-    }
-  }, [user])
 
   const login = useCallback((result: LoginResult) => {
     localStorage.setItem(TOKEN_KEY, result.token)
@@ -33,14 +28,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logout = useCallback(() => {
-    localStorage.removeItem(TOKEN_KEY)
-    localStorage.removeItem(USER_KEY)
+    clearStoredAuth()
     setUser(null)
   }, [])
 
+  const updateUser = useCallback((nextUser: Partial<AuthUser>) => {
+    setUser((currentUser) => (currentUser ? { ...currentUser, ...nextUser } : currentUser))
+  }, [])
+
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem(USER_KEY, JSON.stringify(user))
+    } else {
+      localStorage.removeItem(USER_KEY)
+    }
+  }, [user])
+
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      logout()
+    }
+
+    window.addEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized)
+
+    return () => window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized)
+  }, [logout])
+
   const value = useMemo<AuthContextValue>(
-    () => ({ user, isLoggedIn: user !== null, login, logout }),
-    [user, login, logout],
+    () => ({ user, isLoggedIn: user !== null, login, logout, updateUser }),
+    [user, login, logout, updateUser],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

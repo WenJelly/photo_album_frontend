@@ -3,7 +3,7 @@ import { createContext, useContext } from "react"
 import type { LoginResult } from "@/lib/auth-api"
 
 export interface AuthUser {
-  id: number
+  id: string
   userAccount: string
   userName: string
   userAvatar: string
@@ -16,12 +16,19 @@ export interface AuthContextValue {
   isLoggedIn: boolean
   login: (result: LoginResult) => void
   logout: () => void
+  updateUser: (nextUser: Partial<AuthUser>) => void
 }
 
 export const TOKEN_KEY = "token"
 export const USER_KEY = "auth_user"
+export const AUTH_UNAUTHORIZED_EVENT = "auth:unauthorized"
 
 export const AuthContext = createContext<AuthContextValue | null>(null)
+
+export function clearStoredAuth() {
+  localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(USER_KEY)
+}
 
 export function readStoredUser(): AuthUser | null {
   try {

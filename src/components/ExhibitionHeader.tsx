@@ -4,10 +4,12 @@ import { useAuth } from "@/contexts/auth-context"
 import { cn } from "@/lib/utils"
 
 interface ExhibitionHeaderProps {
-  currentPage: "home" | "gallery"
+  currentPage: "home" | "gallery" | "adminReview" | "me" | "user"
   onHomeClick: () => void
   onGalleryClick: () => void
+  onAdminReviewClick: () => void
   onLoginClick: () => void
+  onMyProfileClick: () => void
   onUploadClick: () => void
 }
 
@@ -15,11 +17,14 @@ export function ExhibitionHeader({
   currentPage,
   onHomeClick,
   onGalleryClick,
+  onAdminReviewClick,
   onLoginClick,
+  onMyProfileClick,
   onUploadClick,
 }: ExhibitionHeaderProps) {
   const { user, isLoggedIn, logout } = useAuth()
   const isHome = currentPage === "home"
+  const isAdmin = user?.userRole === "admin"
   const showUploadAction = isLoggedIn && currentPage === "gallery"
   const navItemClass = (isActive: boolean) =>
     cn(
@@ -69,6 +74,16 @@ export function ExhibitionHeader({
           >
             图库
           </button>
+          {isAdmin ? (
+            <button
+              type="button"
+              onClick={onAdminReviewClick}
+              aria-current={currentPage === "adminReview" ? "page" : undefined}
+              className={navItemClass(currentPage === "adminReview")}
+            >
+              审核管理
+            </button>
+          ) : null}
           {isLoggedIn ? (
             <div className="flex items-center gap-2">
               {showUploadAction ? (
@@ -81,12 +96,17 @@ export function ExhibitionHeader({
                   上传
                 </button>
               ) : null}
-              <div
+              <button
+                type="button"
+                onClick={onMyProfileClick}
+                aria-current={currentPage === "me" ? "page" : undefined}
                 className={cn(
                   "flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm backdrop-blur-md",
                   isHome
                     ? "border-white/28 bg-white/14 text-white"
-                    : "border-white/60 bg-white/72 text-foreground",
+                    : currentPage === "me"
+                      ? "border-white/80 bg-white text-foreground"
+                      : "border-white/60 bg-white/72 text-foreground",
                 )}
               >
                 {user?.userAvatar ? (
@@ -95,7 +115,7 @@ export function ExhibitionHeader({
                   <User className="size-4" />
                 )}
                 <span className="max-w-[8ch] truncate font-medium">{user?.userName}</span>
-              </div>
+              </button>
               <button
                 type="button"
                 onClick={logout}

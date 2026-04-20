@@ -1,8 +1,10 @@
 import request, { unwrapApiResponse, type ApiEnvelope } from "@/lib/request"
+import { normalizeEntityId, stringifyEntityId } from "@/lib/entity-id"
+import { normalizePictureDeleteId } from "@/lib/picture-delete"
 import type { Photo } from "@/types/photo"
 
 interface BackendPictureUser {
-  id: number
+  id: string | number
   userName: string
   userAvatar?: string
   userProfile?: string
@@ -10,7 +12,7 @@ interface BackendPictureUser {
 }
 
 interface BackendPicture {
-  id: number
+  id: string | number
   url: string
   thumbnailUrl?: string
   name?: string
@@ -22,14 +24,14 @@ interface BackendPicture {
   picHeight?: number
   picScale?: number
   picFormat?: string
-  userId?: number
+  userId?: string | number
   user?: BackendPictureUser
   createTime?: string
   editTime?: string
   updateTime?: string
   reviewStatus?: number
   reviewMessage?: string
-  reviewerId?: number
+  reviewerId?: string | number
   reviewTime?: string
   picColor?: string
   viewCount?: number
@@ -49,6 +51,7 @@ export interface ListPicturesParams {
   category?: string
   tags?: string[]
   searchText?: string
+  userId?: string
 }
 
 export interface ListPicturesResult {
@@ -74,6 +77,10 @@ export interface UploadPictureByUrlParams {
   introduction?: string
   category?: string
   tags?: string[]
+}
+
+export interface DeletePictureResult {
+  id: string
 }
 
 const DEFAULT_PAGE_NUM = 1
@@ -112,7 +119,7 @@ function mapPictureToPhoto(picture: BackendPicture): Photo {
   const thumbnailUrl = trimToUndefined(picture.thumbnailUrl) ?? url
 
   return {
-    id: String(picture.id),
+    id: normalizeEntityId(picture.id, "图片 ID 非法"),
     src: url,
     thumbnailSrc: thumbnailUrl,
     width: picture.picWidth && picture.picWidth > 0 ? picture.picWidth : 1,
@@ -132,7 +139,7 @@ function mapPictureToPhoto(picture: BackendPicture): Photo {
     updatedAt: trimToUndefined(picture.updateTime),
     reviewStatus: picture.reviewStatus,
     reviewMessage: trimToUndefined(picture.reviewMessage),
-    userId: picture.userId,
+    userId: picture.userId !== undefined ? stringifyEntityId(picture.userId) : undefined,
   }
 }
 
@@ -145,6 +152,7 @@ function buildListPayload(params: ListPicturesParams) {
   const category = trimToUndefined(params.category)
   const searchText = trimToUndefined(params.searchText)
   const tags = normalizeTags(params.tags)
+  const userId = params.userId ? normalizeEntityId(params.userId, "用户 ID 非法") : undefined
 
   if (category) {
     payload.category = category
@@ -152,6 +160,10 @@ function buildListPayload(params: ListPicturesParams) {
 
   if (searchText) {
     payload.searchText = searchText
+  }
+
+  if (userId) {
+    payload.userId = userId
   }
 
   if (tags.length) {
@@ -186,7 +198,7 @@ export async function listPictures(params: ListPicturesParams = {}): Promise<Lis
 
 export async function getPictureDetail(id: number | string): Promise<Photo> {
   const { data } = await request.get<ApiEnvelope<BackendPicture>>("/api/picture/get/vo", {
-    params: { id },
+    params: { id: normalizeEntityId(id, "图片 ID 非法") },
   })
   const result = unwrapApiResponse(data)
 
@@ -251,4 +263,20 @@ export async function uploadPictureByUrl(params: UploadPictureByUrlParams): Prom
   const result = unwrapApiResponse(data)
 
   return mapPictureToPhoto(result.data)
+}
+
+export async function deletePicture(id: number | string): Promise<DeletePictureResult> {
+  const normalizedId = normalizePictureDeleteId(id)
+  const { data } = await request.post<ApiEnvelope<DeletePictureResult | boolean>>("/api/picture/delete", {
+    id: normalizedId,
+  })
+  const result = unwrapApiResponse(data)
+
+  if (typeof result.data === "boolean") {
+    return { id: normalizedId }
+  }
+
+  return {
+    id: normalizePictureDeleteId(result.data.id),
+  }
 }
