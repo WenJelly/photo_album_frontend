@@ -124,7 +124,9 @@
   }
   html {
     @apply font-sans;
+    overflow-y: scroll;
     scroll-behavior: smooth;
+    scrollbar-gutter: stable;
   }
   body {
     @apply bg-background text-foreground;
@@ -182,4 +184,145 @@
   padding: 0.4rem 0.8rem;
   font-size: 0.78rem;
   line-height: 1;
+}
+
+.home-card-sphere-section {
+  position: relative;
+  isolation: isolate;
+  min-height: 60rem;
+  padding-block: 6rem;
+  --sphere-bg: oklch(0.968 0.007 84);
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--sphere-bg) 94%, white 6%), color-mix(in oklab, var(--sphere-bg) 88%, black 12%));
+}
+
+.home-card-sphere-section::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(246, 242, 235, 0.78), transparent 10%, transparent 90%, rgba(246, 242, 235, 0.78));
+  pointer-events: none;
+}
+
+.home-card-sphere-viewport {
+  position: relative;
+  min-height: 42rem;
+  width: 100%;
+  perspective: 1460px;
+  perspective-origin: 50% 50%;
+  transform-style: preserve-3d;
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+  isolation: isolate;
+  --sphere-radius: 346px;
+  --sphere-diameter: 692px;
+  --sphere-card-size: 64px;
+}
+
+.home-card-sphere-viewport:active {
+  cursor: grabbing;
+}
+
+.home-card-sphere-orbit {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  transform: translate3d(-50%, -50%, 0);
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.home-card-sphere-node {
+  position: absolute;
+  top: calc(var(--sphere-card-size) * -0.5);
+  left: calc(var(--sphere-card-size) * -0.5);
+  width: var(--sphere-card-size);
+  height: var(--sphere-card-size);
+  transform-style: preserve-3d;
+  transform: rotateY(var(--sphere-lon)) rotateX(var(--sphere-lat)) translateZ(var(--sphere-radius));
+}
+
+.home-card-sphere-card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+}
+
+.home-card-sphere-card-face {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 0.72rem;
+  border: 1px solid rgba(255, 255, 255, 0.46);
+  background: rgba(255, 255, 255, 0.42);
+  box-shadow: 0 8px 16px rgba(28, 24, 19, 0.06);
+  backface-visibility: hidden;
+  transform-style: preserve-3d;
+  transition:
+    transform 180ms ease-out,
+    box-shadow 180ms ease-out,
+    filter 180ms ease-out;
+}
+
+.home-card-sphere-card-face--back {
+  transform: rotateY(180deg);
+}
+
+.home-card-sphere-media {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  pointer-events: none;
+}
+
+.home-card-sphere-node:hover .home-card-sphere-card-face,
+.home-card-sphere-node:focus-within .home-card-sphere-card-face {
+  transform: scale(1.03);
+  box-shadow: 0 10px 18px rgba(28, 24, 19, 0.09);
+  filter: brightness(1.05);
+}
+
+.home-card-sphere-node:hover .home-card-sphere-card-face--back,
+.home-card-sphere-node:focus-within .home-card-sphere-card-face--back {
+  transform: rotateY(180deg) scale(1.03);
+}
+
+@media (max-width: 1100px) {
+  .home-card-sphere-section {
+    min-height: 52rem;
+    padding-block: 5rem;
+  }
+
+  .home-card-sphere-viewport {
+    min-height: 36rem;
+  }
+}
+
+@media (max-width: 780px) {
+  .home-card-sphere-section {
+    min-height: 42rem;
+    padding-block: 4rem;
+  }
+
+  .home-card-sphere-viewport {
+    min-height: 28rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .home-card-sphere-section {
+    min-height: 34rem;
+    padding-block: 3rem;
+  }
+
+  .home-card-sphere-viewport {
+    min-height: 22rem;
+  }
 }

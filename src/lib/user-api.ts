@@ -1,5 +1,6 @@
 import request, { unwrapApiResponse, type ApiEnvelope } from "@/lib/request"
 import { normalizeEntityId } from "@/lib/entity-id"
+import { trimToUndefined } from "@/lib/text"
 
 interface BackendUserProfile {
   id: string | number
@@ -39,12 +40,6 @@ export interface UpdateMyProfileParams {
 
 const FALLBACK_USER_NAME = "未命名用户"
 const FALLBACK_USER_ROLE = "user"
-
-function trimToUndefined(value?: string | null) {
-  const normalizedValue = typeof value === "string" ? value.trim() : ""
-
-  return normalizedValue || undefined
-}
 
 function normalizeCount(value?: number | null) {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined

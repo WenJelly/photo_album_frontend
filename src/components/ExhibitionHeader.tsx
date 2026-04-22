@@ -3,6 +3,8 @@ import { LogOut, User } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { cn } from "@/lib/utils"
 
+export type ExhibitionHeaderVariant = "transparent" | "solid"
+
 interface ExhibitionHeaderProps {
   currentPage: "home" | "gallery" | "adminReview" | "me" | "user"
   onHomeClick: () => void
@@ -11,6 +13,7 @@ interface ExhibitionHeaderProps {
   onLoginClick: () => void
   onMyProfileClick: () => void
   onUploadClick: () => void
+  variant: ExhibitionHeaderVariant
 }
 
 export function ExhibitionHeader({
@@ -21,128 +24,132 @@ export function ExhibitionHeader({
   onLoginClick,
   onMyProfileClick,
   onUploadClick,
+  variant,
 }: ExhibitionHeaderProps) {
   const { user, isLoggedIn, logout } = useAuth()
   const isHome = currentPage === "home"
   const isAdmin = user?.userRole === "admin"
   const showUploadAction = isLoggedIn && currentPage === "gallery"
+  const isTransparent = variant === "transparent"
+
   const navItemClass = (isActive: boolean) =>
     cn(
-      "rounded-none px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-      isHome
+      "relative px-2.5 py-1.5 text-[13px] font-medium tracking-[0.02em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+      isTransparent
         ? isActive
           ? "text-white"
-          : "text-white/78 hover:text-white"
+          : "text-white/62 hover:text-white/84"
         : isActive
           ? "text-foreground"
-          : "text-foreground/68 hover:text-foreground",
+          : "text-foreground/52 hover:text-foreground/76",
+      isActive &&
+        "after:absolute after:bottom-0 after:left-2.5 after:right-2.5 after:h-px after:rounded-full after:bg-current",
     )
+
+  const actionClass = cn(
+    "transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+    isTransparent ? "text-white border-white/18 hover:bg-white/10" : "text-foreground border-foreground/14 hover:bg-foreground/[0.05]",
+  )
 
   return (
     <header
+      data-testid="exhibition-header"
+      data-variant={variant}
       className={cn(
-        "inset-x-0 top-0 z-40 border-b border-white/22 shadow-[0_12px_36px_rgba(15,23,42,0.06)] backdrop-blur-2xl",
-        isHome ? "absolute bg-white/18" : "sticky bg-white/55",
+        "fixed inset-x-0 top-0 z-40 transition-[background-color,border-color,box-shadow] duration-200",
+        isTransparent
+          ? "bg-transparent"
+          : "border-b border-black/8 bg-white/92 shadow-[0_12px_30px_rgba(15,23,42,0.06)] backdrop-blur-xl",
       )}
     >
-      <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-5 py-4 md:px-8">
-        <div className="space-y-1">
-          <p className={cn("eyebrow-label", isHome ? "text-white/72" : undefined)}>在线影像档案</p>
-          <h1
-            className={cn(
-              "font-heading text-[1.55rem] font-semibold leading-none tracking-[-0.03em]",
-              isHome ? "text-white" : "text-foreground",
-            )}
-          >
-            WenJelly
-          </h1>
-        </div>
-        <nav className="flex items-center gap-1 sm:gap-2" aria-label="Primary">
+      <div className="w-full px-[5vw] py-3 md:py-3.5">
+        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 md:gap-5">
           <button
             type="button"
             onClick={onHomeClick}
-            aria-current={isHome ? "page" : undefined}
-            className={navItemClass(isHome)}
+            className="group inline-flex shrink-0 items-center text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
-            首页
+            <img
+              src="/logo.png"
+              alt=""
+              aria-hidden="true"
+              className="h-9 w-auto bg-transparent object-contain transition-transform group-hover:scale-[1.03] md:h-10"
+            />
           </button>
-          <button
-            type="button"
-            onClick={onGalleryClick}
-            aria-current={currentPage === "gallery" ? "page" : undefined}
-            className={navItemClass(currentPage === "gallery")}
+
+          <nav
+            className="no-scrollbar ml-5 flex min-w-0 items-center justify-start gap-2 overflow-x-auto sm:ml-7 sm:gap-3"
+            aria-label="Primary"
           >
-            图库
-          </button>
-          {isAdmin ? (
             <button
               type="button"
-              onClick={onAdminReviewClick}
-              aria-current={currentPage === "adminReview" ? "page" : undefined}
-              className={navItemClass(currentPage === "adminReview")}
+              onClick={onHomeClick}
+              aria-current={isHome ? "page" : undefined}
+              className={navItemClass(isHome)}
             >
-              审核管理
+              WenJelly
             </button>
-          ) : null}
-          {isLoggedIn ? (
-            <div className="flex items-center gap-2">
-              {showUploadAction ? (
+            <button
+              type="button"
+              onClick={onGalleryClick}
+              aria-current={currentPage === "gallery" ? "page" : undefined}
+              className={navItemClass(currentPage === "gallery")}
+            >
+              图库
+            </button>
+            {isAdmin ? (
+              <button
+                type="button"
+                onClick={onAdminReviewClick}
+                aria-current={currentPage === "adminReview" ? "page" : undefined}
+                className={navItemClass(currentPage === "adminReview")}
+              >
+                审核管理
+              </button>
+            ) : null}
+          </nav>
+
+          <div className="flex shrink-0 items-center justify-end gap-2">
+            {isLoggedIn ? (
+              <>
+                {showUploadAction ? (
+                  <button
+                    type="button"
+                    data-testid="open-upload-dialog"
+                    onClick={onUploadClick}
+                    className={cn("rounded-full border px-3.5 py-1.5 text-sm font-medium", actionClass)}
+                  >
+                    上传
+                  </button>
+                ) : null}
                 <button
                   type="button"
-                  data-testid="open-upload-dialog"
-                  onClick={onUploadClick}
-                  className="rounded-md border border-white/60 bg-white/78 px-4 py-2 text-sm font-medium text-foreground shadow-[0_8px_24px_rgba(15,23,42,0.06)] backdrop-blur-md transition hover:bg-white"
+                  onClick={onMyProfileClick}
+                  aria-current={currentPage === "me" ? "page" : undefined}
+                  className={cn("flex items-center gap-2 rounded-full border px-3 py-1 text-sm", actionClass)}
                 >
-                  上传
+                  {user?.userAvatar ? (
+                    <img src={user.userAvatar} alt="" className="size-6 rounded-full object-cover" />
+                  ) : (
+                    <User className="size-4" />
+                  )}
+                  <span className="max-w-[8ch] truncate font-medium">{user?.userName}</span>
                 </button>
-              ) : null}
+                <button type="button" onClick={logout} className={cn("rounded-full p-2", actionClass)} aria-label="退出登录">
+                  <LogOut className="size-4" />
+                </button>
+              </>
+            ) : (
               <button
                 type="button"
-                onClick={onMyProfileClick}
-                aria-current={currentPage === "me" ? "page" : undefined}
-                className={cn(
-                  "flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm backdrop-blur-md",
-                  isHome
-                    ? "border-white/28 bg-white/14 text-white"
-                    : currentPage === "me"
-                      ? "border-white/80 bg-white text-foreground"
-                      : "border-white/60 bg-white/72 text-foreground",
-                )}
+                onClick={onLoginClick}
+                className={cn("rounded-full border px-3.5 py-1.5 text-sm font-medium", actionClass)}
               >
-                {user?.userAvatar ? (
-                  <img src={user.userAvatar} alt="" className="size-6 rounded-full object-cover" />
-                ) : (
-                  <User className="size-4" />
-                )}
-                <span className="max-w-[8ch] truncate font-medium">{user?.userName}</span>
+                登录
               </button>
-              <button
-                type="button"
-                onClick={logout}
-                className={cn(
-                  "rounded-md p-2 transition",
-                  isHome ? "text-white/70 hover:text-white" : "text-foreground/60 hover:text-foreground",
-                )}
-                aria-label="退出登录"
-              >
-                <LogOut className="size-4" />
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={onLoginClick}
-              className={cn(
-                "rounded-md border px-4 py-2 text-sm font-medium shadow-[0_8px_24px_rgba(15,23,42,0.06)] backdrop-blur-md transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                isHome
-                  ? "border-white/28 bg-white/14 text-white hover:bg-white/22"
-                  : "border-white/60 bg-white/72 text-foreground hover:bg-white/88",
-              )}
-            >
-              登录
-            </button>
-          )}
-        </nav>
+            )}
+          </div>
+        </div>
       </div>
     </header>
   )

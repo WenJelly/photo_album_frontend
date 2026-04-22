@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { AdminReviewPage } from "@/components/AdminReviewPage"
 import { AuthDialog } from "@/components/AuthDialog"
@@ -26,12 +26,14 @@ type Route =
   | { page: "me" }
   | { page: "user"; userId: string }
 type GalleryLoadState = "idle" | "loading" | "ready" | "error"
+type HeaderVariant = "transparent" | "solid"
 
 const GALLERY_PATH = "/gallery"
 const ADMIN_REVIEW_PATH = "/admin/review"
 const MY_PROFILE_PATH = "/me"
 const USER_PROFILE_PATH_PREFIX = "/users"
 const DEFAULT_GALLERY_ERROR = "图库暂时无法加载，请稍后重试。"
+const HOME_HEADER_OBSERVER_OFFSET_PX = 56
 
 function getRouteFromPathname(pathname: string): Route {
   const normalizedPathname = pathname.replace(/\/+$/, "") || "/"
@@ -88,6 +90,7 @@ function AppShell() {
   const initialRoute = getRouteFromPathname(window.location.pathname)
   const pendingFocusPhotoIdRef = useRef<string | null>(null)
   const photoDetailCacheRef = useRef(new Map<string, Photo>())
+  const homeHeroRef = useRef<HTMLElement | null>(null)
   const { user, isLoggedIn } = useAuth()
 
   const [route, setRoute] = useState<Route>(initialRoute)
@@ -98,6 +101,7 @@ function AppShell() {
   const [galleryError, setGalleryError] = useState<string | null>(null)
   const [galleryNotice, setGalleryNotice] = useState<string | null>(null)
   const [activeCategory, setActiveCategory] = useState("all")
+  const [isHomeHeroVisible, setIsHomeHeroVisible] = useState(initialRoute.page === "home")
   const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false)
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false)
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null)
@@ -109,6 +113,7 @@ function AppShell() {
   const currentPage = route.page
   const routeUserId = route.page === "user" ? route.userId : null
   const isHome = currentPage === "home"
+  const headerVariant: HeaderVariant = isHome && isHomeHeroVisible ? "transparent" : "solid"
   const isAdmin = user?.userRole === "admin"
   const categoryOptions = useMemo<CategoryOption[]>(() => {
     const items = new Map<string, string>()
@@ -181,6 +186,7 @@ function AppShell() {
       clearSelectedPhoto()
 
       if (nextRoute.page === "home") {
+        setIsHomeHeroVisible(true)
         window.scrollTo({ top: 0, behavior: "auto" })
       } else if (nextRoute.page === "gallery" && !galleryPhotos.length) {
         requestGalleryLoad()
@@ -265,6 +271,7 @@ function AppShell() {
       const nextRoute = getRouteFromPathname(window.location.pathname)
 
       if (nextRoute.page === "home") {
+        setIsHomeHeroVisible(true)
         window.scrollTo({ top: 0, behavior: "auto" })
       } else if (nextRoute.page === "gallery" && !galleryPhotos.length) {
         requestGalleryLoad()
@@ -368,12 +375,31 @@ function AppShell() {
     }
   }, [currentPage, selectedPhotoId])
 
-  useLayoutEffect(() => {
-    document.documentElement.style.scrollbarGutter = isHome ? "" : "stable both-edges"
-
-    return () => {
-      document.documentElement.style.scrollbarGutter = ""
+  useEffect(() => {
+    if (!isHome) {
+      return
     }
+
+    const heroElement = homeHeroRef.current
+
+    if (!heroElement || typeof IntersectionObserver === "undefined") {
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsHomeHeroVisible(entry?.isIntersecting ?? true)
+      },
+      {
+        root: null,
+        rootMargin: `-${HOME_HEADER_OBSERVER_OFFSET_PX}px 0px 0px 0px`,
+        threshold: 0,
+      },
+    )
+
+    observer.observe(heroElement)
+
+    return () => observer.disconnect()
   }, [isHome])
 
   const handleUploadSuccess = useCallback((photo: Photo) => {
@@ -417,10 +443,7 @@ function AppShell() {
   return (
     <div
       data-testid="app-shell"
-      className={cn(
-        "flex flex-col bg-background text-foreground",
-        isHome ? "relative h-screen overflow-hidden" : "min-h-screen",
-      )}
+      className="flex min-h-screen flex-col bg-background text-foreground"
     >
       <ExhibitionHeader
         currentPage={currentPage}
@@ -430,10 +453,11 @@ function AppShell() {
         onLoginClick={() => setIsAuthDialogOpen(true)}
         onMyProfileClick={() => navigateToRoute({ page: "me" })}
         onUploadClick={() => setIsUploadDialogOpen(true)}
+        variant={headerVariant}
       />
-      <main className={cn("flex-1", isHome && "min-h-0")}>
+      <main className={cn("flex-1", !isHome && "pt-11 md:pt-12")}>
         {isHome ? (
-          <HeroIntro />
+          <HeroIntro heroRef={homeHeroRef} />
         ) : currentPage === "adminReview" ? (
           <AdminReviewPage currentUserRole={user?.userRole} />
         ) : currentPage === "me" ? (

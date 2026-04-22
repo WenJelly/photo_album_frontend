@@ -1,5 +1,14 @@
 import request, { unwrapApiResponse, type ApiEnvelope } from "@/lib/request"
 import { normalizeEntityId, stringifyEntityId } from "@/lib/entity-id"
+import { trimToUndefined } from "@/lib/text"
+
+export interface AdminPictureUserSummary {
+  id: string
+  userName: string
+  userAvatar?: string
+  userProfile?: string
+  userRole?: string
+}
 
 export interface AdminPictureRecord {
   id: string
@@ -16,15 +25,23 @@ export interface AdminPictureRecord {
   reviewerId?: string
   reviewTime?: string
   userId?: string
+  user?: AdminPictureUserSummary
   createTime?: string
   updateTime?: string
 }
 
-interface BackendAdminPictureRecord extends Omit<AdminPictureRecord, "id" | "reviewerId" | "tags" | "userId"> {
+interface BackendAdminPictureUserSummary extends Omit<AdminPictureUserSummary, "id" | "userName"> {
+  id: string | number
+  userName?: string
+}
+
+interface BackendAdminPictureRecord
+  extends Omit<AdminPictureRecord, "id" | "reviewerId" | "tags" | "userId" | "user"> {
   id: string | number
   reviewerId?: string | number
   tags?: string[] | string
   userId?: string | number
+  user?: BackendAdminPictureUserSummary
 }
 
 interface AdminPicturePageEnvelope {
@@ -59,6 +76,7 @@ export interface ReviewPictureParams {
 const DEFAULT_PAGE_NUM = 1
 const DEFAULT_PAGE_SIZE = 20
 const MAX_PAGE_SIZE = 20
+const FALLBACK_USER_NAME = "未命名用户"
 
 function parseTags(tags?: string[] | string): string[] {
   if (Array.isArray(tags)) {
@@ -81,6 +99,20 @@ function parseTags(tags?: string[] | string): string[] {
   }
 }
 
+function mapAdminPictureUserSummary(user?: BackendAdminPictureUserSummary): AdminPictureUserSummary | undefined {
+  if (!user) {
+    return undefined
+  }
+
+  return {
+    id: normalizeEntityId(user.id, "用户 ID 非法"),
+    userName: trimToUndefined(user.userName) ?? FALLBACK_USER_NAME,
+    userAvatar: trimToUndefined(user.userAvatar),
+    userProfile: trimToUndefined(user.userProfile),
+    userRole: trimToUndefined(user.userRole),
+  }
+}
+
 function mapAdminPictureRecord(picture: BackendAdminPictureRecord): AdminPictureRecord {
   return {
     ...picture,
@@ -88,6 +120,7 @@ function mapAdminPictureRecord(picture: BackendAdminPictureRecord): AdminPicture
     reviewerId: picture.reviewerId !== undefined ? stringifyEntityId(picture.reviewerId) : undefined,
     tags: parseTags(picture.tags),
     userId: picture.userId !== undefined ? stringifyEntityId(picture.userId) : undefined,
+    user: mapAdminPictureUserSummary(picture.user),
   }
 }
 

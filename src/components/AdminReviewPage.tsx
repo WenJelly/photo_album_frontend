@@ -59,6 +59,50 @@ function matchesStatusFilter(record: AdminPictureRecord, reviewStatus?: number) 
 const ADMIN_THUMBNAIL_SIZE = 56
 const ADMIN_DETAIL_PREVIEW_HEIGHT = 512
 
+function getUploaderDisplay(record: Pick<AdminPictureRecord, "user" | "userId">) {
+  const userName = record.user?.userName?.trim()
+  const userId = record.userId ?? record.user?.id
+
+  if (userName) {
+    return {
+      primaryLabel: userName,
+      secondaryLabel: userId ? `#${userId}` : null,
+    }
+  }
+
+  if (userId) {
+    return {
+      primaryLabel: `用户 #${userId}`,
+      secondaryLabel: null,
+    }
+  }
+
+  return {
+    primaryLabel: "-",
+    secondaryLabel: null,
+  }
+}
+
+function mergeAdminPictureRecord(currentRecord: AdminPictureRecord, nextRecord: AdminPictureRecord): AdminPictureRecord {
+  return {
+    ...currentRecord,
+    ...nextRecord,
+    userId: nextRecord.userId ?? currentRecord.userId,
+    user: nextRecord.user ?? currentRecord.user,
+  }
+}
+
+function UploaderSummary({ record }: { record: Pick<AdminPictureRecord, "user" | "userId"> }) {
+  const { primaryLabel, secondaryLabel } = getUploaderDisplay(record)
+
+  return (
+    <div className="space-y-1">
+      <p className="text-foreground">{primaryLabel}</p>
+      {secondaryLabel ? <p className="text-xs text-muted-foreground">{secondaryLabel}</p> : null}
+    </div>
+  )
+}
+
 interface AdminPictureRowProps {
   isSelected: boolean
   onOpenDetail: (record: AdminPictureRecord) => void
@@ -112,7 +156,9 @@ const AdminPictureRow = memo(function AdminPictureRow({
         </div>
       </td>
       <td className="px-4 py-4 text-muted-foreground">{record.category || "未分类"}</td>
-      <td className="px-4 py-4 text-muted-foreground">用户 #{record.userId ?? "-"}</td>
+      <td className="px-4 py-4 align-middle">
+        <UploaderSummary record={record} />
+      </td>
       <td className="px-4 py-4">
         <span
           className={cn(
@@ -142,7 +188,6 @@ export function AdminReviewPage({ currentUserRole }: AdminReviewPageProps) {
   const [totalRecords, setTotalRecords] = useState(0)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
-  const [selectedPictureId, setSelectedPictureId] = useState<string | null>(null)
   const [selectedPicture, setSelectedPicture] = useState<AdminPictureRecord | null>(null)
   const [selectedPictureError, setSelectedPictureError] = useState<string | null>(null)
   const [detailReviewMessage, setDetailReviewMessage] = useState("")
@@ -230,17 +275,27 @@ export function AdminReviewPage({ currentUserRole }: AdminReviewPageProps) {
 
   const applyRecordUpdate = useCallback(
     (updatedRecord: AdminPictureRecord) => {
-      detailCacheRef.current.set(updatedRecord.id, updatedRecord)
+      const currentRecord =
+        detailCacheRef.current.get(updatedRecord.id) ??
+        (selectedPicture?.id === updatedRecord.id ? selectedPicture : undefined) ??
+        records.find((record) => record.id === updatedRecord.id)
+      const mergedRecord = currentRecord ? mergeAdminPictureRecord(currentRecord, updatedRecord) : updatedRecord
+
+      detailCacheRef.current.set(mergedRecord.id, mergedRecord)
       setRecords((current) => {
-        const nextRecords = current.map((record) => (record.id === updatedRecord.id ? updatedRecord : record))
+        const nextRecords = current.map((record) =>
+          record.id === updatedRecord.id ? mergeAdminPictureRecord(record, updatedRecord) : record,
+        )
 
         return filters.reviewStatus === undefined
           ? nextRecords
           : nextRecords.filter((record) => matchesStatusFilter(record, filters.reviewStatus))
       })
-      setSelectedPicture((current) => (current?.id === updatedRecord.id ? updatedRecord : current))
+      setSelectedPicture((current) =>
+        current?.id === updatedRecord.id ? mergeAdminPictureRecord(current, updatedRecord) : current,
+      )
     },
-    [filters.reviewStatus],
+    [filters.reviewStatus, records, selectedPicture],
   )
 
   const handleStatusFilterChange = useCallback((reviewStatus?: number) => {
@@ -292,10 +347,11 @@ export function AdminReviewPage({ currentUserRole }: AdminReviewPageProps) {
   }, [])
 
   const handleOpenDetail = useCallback(async (record: AdminPictureRecord) => {
-    setSelectedPictureId(record.id)
-    setSelectedPicture(detailCacheRef.current.get(record.id) ?? record)
+    const cachedOrCurrentRecord = detailCacheRef.current.get(record.id) ?? record
+
+    setSelectedPicture(cachedOrCurrentRecord)
     setSelectedPictureError(null)
-    setDetailReviewMessage((detailCacheRef.current.get(record.id) ?? record).reviewMessage ?? "")
+    setDetailReviewMessage(cachedOrCurrentRecord.reviewMessage ?? "")
     setActionNotice(null)
 
     try {
@@ -306,9 +362,11 @@ export function AdminReviewPage({ currentUserRole }: AdminReviewPageProps) {
       }
 
       const detail = await getAdminPictureDetail(record.id)
-      detailCacheRef.current.set(detail.id, detail)
-      setSelectedPicture(detail)
-      setDetailReviewMessage(detail.reviewMessage ?? "")
+      const mergedDetail = mergeAdminPictureRecord(cachedOrCurrentRecord, detail)
+
+      detailCacheRef.current.set(mergedDetail.id, mergedDetail)
+      setSelectedPicture(mergedDetail)
+      setDetailReviewMessage(mergedDetail.reviewMessage ?? "")
     } catch (error) {
       setSelectedPictureError(error instanceof Error ? error.message : "图片详情暂时无法加载。")
     }
@@ -325,7 +383,7 @@ export function AdminReviewPage({ currentUserRole }: AdminReviewPageProps) {
   )
 
   const handleDetailReview = useCallback(async (reviewStatus: 1 | 2) => {
-    if (!selectedPictureId) {
+    if (!selectedPicture) {
       return
     }
 
@@ -342,7 +400,7 @@ export function AdminReviewPage({ currentUserRole }: AdminReviewPageProps) {
 
     try {
       await submitReviewAction({
-        id: selectedPictureId,
+        id: selectedPicture.id,
         reviewStatus,
         reviewMessage: normalizedMessage || undefined,
       })
@@ -353,7 +411,7 @@ export function AdminReviewPage({ currentUserRole }: AdminReviewPageProps) {
     } finally {
       setIsSubmittingDetailAction(false)
     }
-  }, [detailReviewMessage, selectedPictureId, submitReviewAction])
+  }, [detailReviewMessage, selectedPicture, submitReviewAction])
 
   const handleBatchReview = useCallback(async (reviewStatus: 1 | 2) => {
     if (!selectedIds.length) {
@@ -413,7 +471,6 @@ export function AdminReviewPage({ currentUserRole }: AdminReviewPageProps) {
       detailCacheRef.current.delete(deletedId)
       setRecords((current) => current.filter((record) => record.id !== deletedId))
       setSelectedIds((current) => current.filter((id) => id !== deletedId))
-      setSelectedPictureId(null)
       setSelectedPicture(null)
       setDetailReviewMessage("")
       setActionNotice(`已删除图片 ${deletedId}。`)
@@ -621,7 +678,9 @@ export function AdminReviewPage({ currentUserRole }: AdminReviewPageProps) {
                   </div>
                   <div>
                     <dt className="text-xs tracking-[0.16em] text-muted-foreground">上传者</dt>
-                    <dd className="mt-1 text-base text-foreground">用户 #{selectedPicture.userId ?? "-"}</dd>
+                    <dd className="mt-1">
+                      <UploaderSummary record={selectedPicture} />
+                    </dd>
                   </div>
                   <div>
                     <dt className="text-xs tracking-[0.16em] text-muted-foreground">当前状态</dt>

@@ -1,49 +1,14 @@
 import request, { unwrapApiResponse, type ApiEnvelope } from "@/lib/request"
-import { normalizeEntityId, stringifyEntityId } from "@/lib/entity-id"
+import {
+  type BackendPicture,
+  type BackendPicturePage,
+  mapBackendPictureToPhoto,
+  normalizePictureTags,
+} from "@/lib/backend-picture"
+import { normalizeEntityId } from "@/lib/entity-id"
 import { normalizePictureDeleteId } from "@/lib/picture-delete"
+import { trimToUndefined } from "@/lib/text"
 import type { Photo } from "@/types/photo"
-
-interface BackendPictureUser {
-  id: string | number
-  userName: string
-  userAvatar?: string
-  userProfile?: string
-  userRole?: string
-}
-
-interface BackendPicture {
-  id: string | number
-  url: string
-  thumbnailUrl?: string
-  name?: string
-  introduction?: string
-  category?: string
-  tags?: string[]
-  picSize?: number
-  picWidth?: number
-  picHeight?: number
-  picScale?: number
-  picFormat?: string
-  userId?: string | number
-  user?: BackendPictureUser
-  createTime?: string
-  editTime?: string
-  updateTime?: string
-  reviewStatus?: number
-  reviewMessage?: string
-  reviewerId?: string | number
-  reviewTime?: string
-  picColor?: string
-  viewCount?: number
-  likeCount?: number
-}
-
-interface BackendPicturePage {
-  pageNum: number
-  pageSize: number
-  total: number
-  list: BackendPicture[]
-}
 
 export interface ListPicturesParams {
   pageNum?: number
@@ -87,62 +52,6 @@ const DEFAULT_PAGE_NUM = 1
 const DEFAULT_PAGE_SIZE = 20
 const MAX_PAGE_SIZE = 20
 const UPLOAD_REQUEST_TIMEOUT = 60_000
-const FALLBACK_PHOTO_NAME = "Untitled"
-const FALLBACK_USER_NAME = "Unknown"
-const FALLBACK_CATEGORY = "uncategorized"
-const FALLBACK_CATEGORY_LABEL = "未分类"
-const FALLBACK_SUMMARY = "No description yet."
-
-function trimToUndefined(value?: string | null) {
-  const normalizedValue = typeof value === "string" ? value.trim() : ""
-  return normalizedValue || undefined
-}
-
-function normalizeTags(tags?: string[] | null) {
-  if (!Array.isArray(tags)) {
-    return []
-  }
-
-  return [...new Set(tags.map((tag) => tag.trim()).filter(Boolean))]
-}
-
-function toPhotoCategory(category?: string | null) {
-  return trimToUndefined(category) ?? FALLBACK_CATEGORY
-}
-
-function toPhotoCategoryLabel(category: string) {
-  return category === FALLBACK_CATEGORY ? FALLBACK_CATEGORY_LABEL : category
-}
-
-function mapPictureToPhoto(picture: BackendPicture): Photo {
-  const category = toPhotoCategory(picture.category)
-  const url = trimToUndefined(picture.url) ?? trimToUndefined(picture.thumbnailUrl) ?? ""
-  const thumbnailUrl = trimToUndefined(picture.thumbnailUrl) ?? url
-
-  return {
-    id: normalizeEntityId(picture.id, "图片 ID 非法"),
-    src: url,
-    thumbnailSrc: thumbnailUrl,
-    width: picture.picWidth && picture.picWidth > 0 ? picture.picWidth : 1,
-    height: picture.picHeight && picture.picHeight > 0 ? picture.picHeight : 1,
-    alt: trimToUndefined(picture.name) ?? FALLBACK_PHOTO_NAME,
-    photographer: trimToUndefined(picture.user?.userName) ?? FALLBACK_USER_NAME,
-    category,
-    categoryLabel: toPhotoCategoryLabel(category),
-    summary: trimToUndefined(picture.introduction) ?? FALLBACK_SUMMARY,
-    location: trimToUndefined(picture.createTime) ?? "",
-    tags: normalizeTags(picture.tags),
-    format: trimToUndefined(picture.picFormat)?.toUpperCase(),
-    dominantColor: trimToUndefined(picture.picColor),
-    viewCount: picture.viewCount ?? 0,
-    likeCount: picture.likeCount ?? 0,
-    createdAt: trimToUndefined(picture.createTime),
-    updatedAt: trimToUndefined(picture.updateTime),
-    reviewStatus: picture.reviewStatus,
-    reviewMessage: trimToUndefined(picture.reviewMessage),
-    userId: picture.userId !== undefined ? stringifyEntityId(picture.userId) : undefined,
-  }
-}
 
 function buildListPayload(params: ListPicturesParams) {
   const payload: Record<string, unknown> = {
@@ -152,7 +61,7 @@ function buildListPayload(params: ListPicturesParams) {
 
   const category = trimToUndefined(params.category)
   const searchText = trimToUndefined(params.searchText)
-  const tags = normalizeTags(params.tags)
+  const tags = normalizePictureTags(params.tags)
   const userId = params.userId ? normalizeEntityId(params.userId, "用户 ID 非法") : undefined
 
   if (category) {
@@ -193,7 +102,7 @@ export async function listPictures(params: ListPicturesParams = {}): Promise<Lis
     pageNum: result.data.pageNum,
     pageSize: result.data.pageSize,
     total: result.data.total,
-    list: result.data.list.map(mapPictureToPhoto),
+    list: result.data.list.map(mapBackendPictureToPhoto),
   }
 }
 
@@ -203,12 +112,12 @@ export async function getPictureDetail(id: number | string): Promise<Photo> {
   })
   const result = unwrapApiResponse(data)
 
-  return mapPictureToPhoto(result.data)
+  return mapBackendPictureToPhoto(result.data)
 }
 
 export async function uploadPictureFile(params: UploadPictureFileParams): Promise<Photo> {
   const formData = new FormData()
-  const tags = normalizeTags(params.tags)
+  const tags = normalizePictureTags(params.tags)
 
   formData.append("file", params.file)
 
@@ -232,13 +141,13 @@ export async function uploadPictureFile(params: UploadPictureFileParams): Promis
   })
   const result = unwrapApiResponse(data)
 
-  return mapPictureToPhoto(result.data)
+  return mapBackendPictureToPhoto(result.data)
 }
 
 export async function uploadPictureByUrl(params: UploadPictureByUrlParams): Promise<Photo> {
   const payload: Record<string, unknown> = {
     fileUrl: params.fileUrl.trim(),
-    tags: normalizeTags(params.tags),
+    tags: normalizePictureTags(params.tags),
   }
 
   if (params.id !== undefined && params.id !== null) {
@@ -266,7 +175,7 @@ export async function uploadPictureByUrl(params: UploadPictureByUrlParams): Prom
   })
   const result = unwrapApiResponse(data)
 
-  return mapPictureToPhoto(result.data)
+  return mapBackendPictureToPhoto(result.data)
 }
 
 export async function deletePicture(id: number | string): Promise<DeletePictureResult> {
