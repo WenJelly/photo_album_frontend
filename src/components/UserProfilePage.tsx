@@ -15,7 +15,7 @@ import type { Photo } from "@/types/photo"
 import { PhotoGrid } from "./PhotoGrid"
 import { PhotoPreviewOverlay } from "./PhotoPreviewOverlay"
 
-type LoadState = "idle" | "loading" | "ready" | "error"
+type LoadState = "loading" | "ready" | "error"
 type UserProfileMode = "me" | "public"
 
 interface UserProfilePageProps {
@@ -115,8 +115,13 @@ export function UserProfilePage({ mode, userId, onNavigateToUser }: UserProfileP
   const normalizedDraftUserName = draftUserName.trim()
   const normalizedDraftUserAvatar = draftUserAvatar.trim()
   const normalizedDraftUserProfile = draftUserProfile.trim()
+  const syncDraftProfile = useCallback((nextProfile: UserProfile) => {
+    setDraftUserName(nextProfile.userName)
+    setDraftUserAvatar(nextProfile.userAvatar)
+    setDraftUserProfile(nextProfile.userProfile)
+  }, [])
   const isProfileDirty =
-    Boolean(profile) &&
+    profile !== null &&
     (normalizedDraftUserName !== profile.userName ||
       normalizedDraftUserAvatar !== profile.userAvatar ||
       normalizedDraftUserProfile !== profile.userProfile)
@@ -275,9 +280,7 @@ export function UserProfilePage({ mode, userId, onNavigateToUser }: UserProfileP
         }
 
         setProfile(nextProfile)
-        setDraftUserName(nextProfile.userName)
-        setDraftUserAvatar(nextProfile.userAvatar)
-        setDraftUserProfile(nextProfile.userProfile)
+        syncDraftProfile(nextProfile)
         setProfileLoadState("ready")
       } catch (error) {
         if (isCancelled) {
@@ -294,7 +297,7 @@ export function UserProfilePage({ mode, userId, onNavigateToUser }: UserProfileP
     return () => {
       isCancelled = true
     }
-  }, [isMe, resolvedUserId])
+  }, [isMe, resolvedUserId, syncDraftProfile])
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -373,9 +376,7 @@ export function UserProfilePage({ mode, userId, onNavigateToUser }: UserProfileP
       })
 
       setProfile(nextProfile)
-      setDraftUserName(nextProfile.userName)
-      setDraftUserAvatar(nextProfile.userAvatar)
-      setDraftUserProfile(nextProfile.userProfile)
+      syncDraftProfile(nextProfile)
       updateUser({
         userAvatar: nextProfile.userAvatar,
         userName: nextProfile.userName,
@@ -388,7 +389,7 @@ export function UserProfilePage({ mode, userId, onNavigateToUser }: UserProfileP
     } finally {
       setIsSavingProfile(false)
     }
-  }, [draftUserAvatar, draftUserName, draftUserProfile, normalizedDraftUserName, updateUser])
+  }, [draftUserAvatar, draftUserName, draftUserProfile, normalizedDraftUserName, syncDraftProfile, updateUser])
 
   const handleDeletePreviewPhoto = useCallback(async () => {
     if (!previewPhoto) {
@@ -544,9 +545,7 @@ export function UserProfilePage({ mode, userId, onNavigateToUser }: UserProfileP
                   <Button
                     variant="outline"
                     onClick={() => {
-                      setDraftUserName(profile.userName)
-                      setDraftUserAvatar(profile.userAvatar)
-                      setDraftUserProfile(profile.userProfile)
+                      syncDraftProfile(profile)
                       setProfileFormError(null)
                       setIsEditingProfile(false)
                     }}

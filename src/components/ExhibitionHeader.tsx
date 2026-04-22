@@ -70,7 +70,7 @@ export function ExhibitionHeader({
             className="group inline-flex shrink-0 items-center text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <img
-              src="/logo.png"
+              src="/boluo.svg"
               alt=""
               aria-hidden="true"
               className="h-9 w-auto bg-transparent object-contain transition-transform group-hover:scale-[1.03] md:h-10"

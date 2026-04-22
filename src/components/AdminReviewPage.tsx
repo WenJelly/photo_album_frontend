@@ -58,6 +58,15 @@ function matchesStatusFilter(record: AdminPictureRecord, reviewStatus?: number) 
 
 const ADMIN_THUMBNAIL_SIZE = 56
 const ADMIN_DETAIL_PREVIEW_HEIGHT = 512
+const ADMIN_REVIEW_PAGE_SIZE = 20
+
+function buildAdminReviewFilters(reviewStatus: number | undefined = 0): ListAdminPicturesParams {
+  return {
+    pageNum: 1,
+    pageSize: ADMIN_REVIEW_PAGE_SIZE,
+    reviewStatus,
+  }
+}
 
 function getUploaderDisplay(record: Pick<AdminPictureRecord, "user" | "userId">) {
   const userName = record.user?.userName?.trim()
@@ -176,11 +185,7 @@ const AdminPictureRow = memo(function AdminPictureRow({
 
 export function AdminReviewPage({ currentUserRole }: AdminReviewPageProps) {
   const detailCacheRef = useRef(new Map<string, AdminPictureRecord>())
-  const [filters, setFilters] = useState<ListAdminPicturesParams>({
-    pageNum: 1,
-    pageSize: 20,
-    reviewStatus: 0,
-  })
+  const [filters, setFilters] = useState<ListAdminPicturesParams>(() => buildAdminReviewFilters())
   const [clientPageNum, setClientPageNum] = useState(1)
   const [isClientPaginating, setIsClientPaginating] = useState(false)
   const [pageState, setPageState] = useState<ReviewPageState>("loading")
@@ -211,7 +216,7 @@ export function AdminReviewPage({ currentUserRole }: AdminReviewPageProps) {
 
       try {
         const result = await listAdminPictures(filters)
-        const requestedPageSize = filters.pageSize ?? DEFAULT_PAGE_SIZE
+        const requestedPageSize = filters.pageSize ?? ADMIN_REVIEW_PAGE_SIZE
         const shouldUseClientPagination = result.list.length > requestedPageSize
 
         if (isCancelled) {
@@ -244,7 +249,7 @@ export function AdminReviewPage({ currentUserRole }: AdminReviewPageProps) {
     }
   }, [currentUserRole, filters])
 
-  const pageSize = filters.pageSize ?? DEFAULT_PAGE_SIZE
+  const pageSize = filters.pageSize ?? ADMIN_REVIEW_PAGE_SIZE
   const currentPageNum = isClientPaginating ? clientPageNum : (filters.pageNum ?? 1)
   const pageCount = useMemo(
     () => Math.max(1, Math.ceil(Math.max(totalRecords, records.length) / pageSize)),
@@ -303,11 +308,7 @@ export function AdminReviewPage({ currentUserRole }: AdminReviewPageProps) {
     setClientPageNum(1)
     setIsClientPaginating(false)
     startTransition(() => {
-      setFilters({
-        pageNum: 1,
-        pageSize: 20,
-        reviewStatus,
-      })
+      setFilters(buildAdminReviewFilters(reviewStatus))
     })
   }, [])
 

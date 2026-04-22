@@ -186,143 +186,131 @@
   line-height: 1;
 }
 
-.home-card-sphere-section {
+.home-hero-shell {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.home-hero-surface {
+  position: relative;
+}
+
+.home-hero-shell::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: clamp(8rem, 16vw, 13rem);
+  pointer-events: none;
+  z-index: 1;
+  background:
+    radial-gradient(120% 100% at 50% 100%, rgba(2, 6, 23, 0.48) 0%, rgba(2, 6, 23, 0.16) 42%, transparent 78%);
+}
+
+.home-hero-shell::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: clamp(6rem, 12vw, 11rem);
+  pointer-events: none;
+  z-index: 2;
+  background:
+    linear-gradient(180deg, rgba(2, 6, 23, 0) 0%, rgba(2, 6, 23, 0.12) 22%, rgba(2, 6, 23, 0.64) 72%, #020617 100%);
+}
+
+.sphere-experience-section {
   position: relative;
   isolation: isolate;
   min-height: 60rem;
-  padding-block: 6rem;
-  --sphere-bg: oklch(0.968 0.007 84);
-  background:
-    linear-gradient(180deg, color-mix(in oklab, var(--sphere-bg) 94%, white 6%), color-mix(in oklab, var(--sphere-bg) 88%, black 12%));
+  padding-block: 0;
+  overflow: hidden;
+  background: #020617;
 }
 
-.home-card-sphere-section::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(180deg, rgba(246, 242, 235, 0.78), transparent 10%, transparent 90%, rgba(246, 242, 235, 0.78));
-  pointer-events: none;
-}
-
-.home-card-sphere-viewport {
+.sphere-experience-loading-shell,
+.sphere-experience-canvas-shell {
   position: relative;
-  min-height: 42rem;
   width: 100%;
-  perspective: 1460px;
-  perspective-origin: 50% 50%;
-  transform-style: preserve-3d;
+  min-height: inherit;
+}
+
+.sphere-experience-loading-shell {
+  z-index: 2;
+  background: #020617;
+}
+
+.sphere-experience-canvas-shell {
+  z-index: 3;
   touch-action: none;
   user-select: none;
   cursor: grab;
-  isolation: isolate;
-  --sphere-radius: 346px;
-  --sphere-diameter: 692px;
-  --sphere-card-size: 64px;
-}
-
-.home-card-sphere-viewport:active {
-  cursor: grabbing;
-}
-
-.home-card-sphere-orbit {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 0;
-  height: 0;
-  transform: translate3d(-50%, -50%, 0);
-  transform-style: preserve-3d;
+  height: 100%;
+  transform: translateZ(0);
   will-change: transform;
 }
 
-.home-card-sphere-node {
-  position: absolute;
-  top: calc(var(--sphere-card-size) * -0.5);
-  left: calc(var(--sphere-card-size) * -0.5);
-  width: var(--sphere-card-size);
-  height: var(--sphere-card-size);
-  transform-style: preserve-3d;
-  transform: rotateY(var(--sphere-lon)) rotateX(var(--sphere-lat)) translateZ(var(--sphere-radius));
+.sphere-experience-canvas-shell[data-interaction-phase="dragging"],
+.sphere-experience-canvas-shell[data-interaction-phase="settling"] {
+  cursor: grabbing;
 }
 
-.home-card-sphere-card {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  transform-style: preserve-3d;
-}
-
-.home-card-sphere-card-face {
-  position: absolute;
+.sphere-experience-canvas {
+  position: absolute !important;
   inset: 0;
-  overflow: hidden;
-  border-radius: 0.72rem;
-  border: 1px solid rgba(255, 255, 255, 0.46);
-  background: rgba(255, 255, 255, 0.42);
-  box-shadow: 0 8px 16px rgba(28, 24, 19, 0.06);
-  backface-visibility: hidden;
-  transform-style: preserve-3d;
-  transition:
-    transform 180ms ease-out,
-    box-shadow 180ms ease-out,
-    filter 180ms ease-out;
-}
-
-.home-card-sphere-card-face--back {
-  transform: rotateY(180deg);
-}
-
-.home-card-sphere-media {
   display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center;
+  width: 100% !important;
+  height: 100% !important;
   pointer-events: none;
 }
 
-.home-card-sphere-node:hover .home-card-sphere-card-face,
-.home-card-sphere-node:focus-within .home-card-sphere-card-face {
-  transform: scale(1.03);
-  box-shadow: 0 10px 18px rgba(28, 24, 19, 0.09);
-  filter: brightness(1.05);
+.sphere-experience-status-layer {
+  position: absolute;
+  top: 1.35rem;
+  right: 1.35rem;
+  z-index: 5;
+  pointer-events: none;
 }
 
-.home-card-sphere-node:hover .home-card-sphere-card-face--back,
-.home-card-sphere-node:focus-within .home-card-sphere-card-face--back {
-  transform: rotateY(180deg) scale(1.03);
+.sphere-experience-status-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.56);
+  box-shadow: 0 18px 34px rgba(2, 6, 23, 0.24);
+  color: rgba(226, 232, 240, 0.9);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  padding: 0.52rem 0.82rem;
+  text-transform: uppercase;
 }
 
 @media (max-width: 1100px) {
-  .home-card-sphere-section {
+  .sphere-experience-section {
     min-height: 52rem;
-    padding-block: 5rem;
-  }
-
-  .home-card-sphere-viewport {
-    min-height: 36rem;
   }
 }
 
 @media (max-width: 780px) {
-  .home-card-sphere-section {
+  .sphere-experience-section {
     min-height: 42rem;
-    padding-block: 4rem;
   }
 
-  .home-card-sphere-viewport {
-    min-height: 28rem;
+  .sphere-experience-status-layer {
+    top: 1rem;
+    right: 1rem;
   }
 }
 
 @media (max-width: 640px) {
-  .home-card-sphere-section {
+  .sphere-experience-section {
     min-height: 34rem;
-    padding-block: 3rem;
   }
 
-  .home-card-sphere-viewport {
-    min-height: 22rem;
+  .sphere-experience-status-chip {
+    font-size: 0.65rem;
+    padding: 0.46rem 0.72rem;
   }
 }
