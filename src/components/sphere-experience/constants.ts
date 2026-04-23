@@ -3,7 +3,7 @@ import type { SphereImageRecord, SphereSceneMetrics } from "./types"
 export const SPHERE_COLS = 40
 export const SPHERE_ROWS = 5
 export const SPHERE_INSTANCE_COUNT = SPHERE_COLS * SPHERE_ROWS
-export const SPHERE_FETCH_LIMIT = 20
+export const SPHERE_FETCH_LIMIT = 200
 export const SPHERE_PREFETCH_ROOT_MARGIN = "0px"
 
 const CARD_GAP_PX = 6
@@ -13,17 +13,19 @@ function clamp(value: number, min: number, max: number) {
 }
 
 export function sanitizeSphereImageRecord(record: SphereImageRecord) {
+  const imageUrl = record.imageUrl.trim()
+  const fallbackImageUrl = record.fallbackImageUrl?.trim()
+
   return {
     id: record.id,
-    imageUrl: record.imageUrl.trim(),
+    imageUrl,
+    fallbackImageUrl: fallbackImageUrl && fallbackImageUrl !== imageUrl ? fallbackImageUrl : undefined,
     alt: record.alt.trim() || "Gallery image",
   } satisfies SphereImageRecord
 }
 
 export function normalizeSphereImageRecords(records: SphereImageRecord[]) {
-  return records
-    .map(sanitizeSphereImageRecord)
-    .filter((record, index, items) => record.imageUrl && items.findIndex((item) => item.id === record.id) === index)
+  return records.map(sanitizeSphereImageRecord).filter((record) => record.imageUrl || record.fallbackImageUrl)
 }
 
 export function createPlaceholderSphereRecord() {
@@ -32,6 +34,16 @@ export function createPlaceholderSphereRecord() {
     imageUrl: "",
     alt: "Placeholder image",
   } satisfies SphereImageRecord
+}
+
+export function expandSphereImageRecords(records: SphereImageRecord[]) {
+  const normalizedRecords = normalizeSphereImageRecords(records)
+  const safeRecords = normalizedRecords.length ? normalizedRecords : [createPlaceholderSphereRecord()]
+  const columns = Math.ceil(Math.sqrt(safeRecords.length))
+  const rows = Math.ceil(safeRecords.length / columns)
+  const expandedCount = columns * rows
+
+  return Array.from({ length: expandedCount }, (_, index) => safeRecords[index % safeRecords.length]!)
 }
 
 export function computeSphereSceneMetrics(width: number, height: number): SphereSceneMetrics {

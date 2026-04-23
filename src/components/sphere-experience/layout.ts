@@ -1,6 +1,6 @@
 import { Quaternion, Vector3 } from "three"
 
-import { createPlaceholderSphereRecord, SPHERE_COLS, SPHERE_ROWS } from "./constants"
+import { expandSphereImageRecords, SPHERE_COLS, SPHERE_ROWS } from "./constants"
 import type { SphereCardPlacement, SphereImageRecord } from "./types"
 
 const BASE_ROW_STEP_FACTOR = 0.854
@@ -12,7 +12,7 @@ const X_AXIS = new Vector3(1, 0, 0)
 const Y_AXIS = new Vector3(0, 1, 0)
 
 export function buildSphereCardPlacements(records: SphereImageRecord[], radius: number): SphereCardPlacement[] {
-  const pool = records.length ? records : [createPlaceholderSphereRecord()]
+  const pool = expandSphereImageRecords(records)
   const longitudeStepDeg = 360 / SPHERE_COLS
   const rowStepDeg = longitudeStepDeg * ROW_STEP_FACTOR
   const staggerDeg = rowStepDeg * STAGGER_FACTOR

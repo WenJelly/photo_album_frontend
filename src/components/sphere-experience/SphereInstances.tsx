@@ -121,7 +121,9 @@ export const SphereInstances = forwardRef<Group, SphereInstancesProps>(function 
         },
         vertexShader: VERTEX_SHADER,
         fragmentShader: FRAGMENT_SHADER,
-        transparent: true,
+        // Treat the cards as alpha-cutout surfaces instead of blended transparency.
+        // Instanced transparent meshes are not sorted per-card, which can produce false holes.
+        transparent: false,
         depthWrite: true,
         alphaTest: 0.08,
         side: DoubleSide,

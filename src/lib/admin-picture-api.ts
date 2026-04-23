@@ -1,5 +1,6 @@
 import request, { unwrapApiResponse, type ApiEnvelope } from "@/lib/request"
 import { normalizeEntityId, stringifyEntityId } from "@/lib/entity-id"
+import { ADMIN_REVIEW_LIST_COMPRESS, cloneCompressPictureType } from "@/lib/picture-compress"
 import { trimToUndefined } from "@/lib/text"
 
 export interface AdminPictureUserSummary {
@@ -18,8 +19,11 @@ export interface AdminPictureRecord {
   introduction?: string
   category?: string
   tags: string[]
+  picSize?: number
   picWidth?: number
   picHeight?: number
+  picScale?: number
+  picFormat?: string
   reviewStatus?: number
   reviewMessage?: string
   reviewerId?: string
@@ -27,7 +31,11 @@ export interface AdminPictureRecord {
   userId?: string
   user?: AdminPictureUserSummary
   createTime?: string
+  editTime?: string
   updateTime?: string
+  picColor?: string
+  viewCount?: number
+  likeCount?: number
 }
 
 interface BackendAdminPictureUserSummary extends Omit<AdminPictureUserSummary, "id" | "userName"> {
@@ -130,10 +138,8 @@ export async function listAdminPictures(
   const payload: Record<string, unknown> = {
     pageNum: params.pageNum ?? DEFAULT_PAGE_NUM,
     pageSize: Math.min(params.pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE),
-  }
-
-  if (params.reviewStatus !== undefined) {
-    payload.reviewStatus = params.reviewStatus
+    reviewStatus: params.reviewStatus ?? -1,
+    compressPictureType: cloneCompressPictureType(ADMIN_REVIEW_LIST_COMPRESS),
   }
 
   if (params.category) {
@@ -148,7 +154,7 @@ export async function listAdminPictures(
     payload.searchText = params.searchText
   }
 
-  const { data } = await request.post<ApiEnvelope<AdminPicturePageEnvelope>>("/api/picture/list/page", payload)
+  const { data } = await request.post<ApiEnvelope<AdminPicturePageEnvelope>>("/api/admin/picture/list", payload)
   const result = unwrapApiResponse(data)
 
   return {
@@ -157,15 +163,6 @@ export async function listAdminPictures(
     total: result.data.total,
     list: result.data.list.map(mapAdminPictureRecord),
   }
-}
-
-export async function getAdminPictureDetail(id: string | number): Promise<AdminPictureRecord> {
-  const { data } = await request.get<ApiEnvelope<BackendAdminPictureRecord>>("/api/picture/get", {
-    params: { id: normalizeEntityId(id, "图片 ID 非法") },
-  })
-  const result = unwrapApiResponse(data)
-
-  return mapAdminPictureRecord(result.data)
 }
 
 export async function reviewPicture(params: ReviewPictureParams): Promise<AdminPictureRecord> {

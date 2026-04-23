@@ -112,7 +112,7 @@ describe("SphereExperienceSection", () => {
     })
 
     await waitFor(() => {
-      expect(dataSource.fetchImages).toHaveBeenCalledWith({ limit: 20 })
+      expect(dataSource.fetchImages).toHaveBeenCalledWith({ limit: 200 })
     })
 
     await waitFor(() => {

@@ -1,6 +1,7 @@
 export interface SphereImageRecord {
   id: string
   imageUrl: string
+  fallbackImageUrl?: string
   alt: string
 }
 

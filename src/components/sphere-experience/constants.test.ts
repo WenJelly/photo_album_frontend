@@ -1,4 +1,11 @@
-import { computeSphereSceneMetrics, SPHERE_COLS, SPHERE_INSTANCE_COUNT, SPHERE_ROWS } from "./constants"
+import {
+  computeSphereSceneMetrics,
+  expandSphereImageRecords,
+  normalizeSphereImageRecords,
+  SPHERE_COLS,
+  SPHERE_INSTANCE_COUNT,
+  SPHERE_ROWS,
+} from "./constants"
 import { buildSphereCardPlacements } from "./layout"
 
 describe("sphere-experience constants", () => {
@@ -49,5 +56,47 @@ describe("sphere-experience constants", () => {
         expect(placement?.position[1]).toBeCloseTo(expectedY, 5)
       })
     })
+  })
+
+  it("keeps duplicate records and preserves fallback urls for sphere reuse", () => {
+    const records = normalizeSphereImageRecords([
+      {
+        id: "1",
+        imageUrl: "https://example.com/thumb-1.jpg",
+        fallbackImageUrl: "https://example.com/photo-1.jpg",
+        alt: "One",
+      },
+      {
+        id: "1",
+        imageUrl: "https://example.com/thumb-1.jpg",
+        fallbackImageUrl: "https://example.com/photo-1.jpg",
+        alt: "One duplicated",
+      },
+      {
+        id: "2",
+        imageUrl: "   ",
+        fallbackImageUrl: "https://example.com/photo-2.jpg",
+        alt: "Two",
+      },
+    ])
+
+    expect(records).toHaveLength(3)
+    expect(records[0]?.fallbackImageUrl).toBe("https://example.com/photo-1.jpg")
+    expect(records[2]?.imageUrl).toBe("")
+    expect(records[2]?.fallbackImageUrl).toBe("https://example.com/photo-2.jpg")
+  })
+
+  it("expands partial image pools to a full atlas grid", () => {
+    const records = Array.from({ length: 26 }, (_, index) => ({
+      id: String(index + 1),
+      imageUrl: `https://example.com/${index + 1}.jpg`,
+      alt: `Image ${index + 1}`,
+    }))
+
+    const expandedRecords = expandSphereImageRecords(records)
+
+    expect(expandedRecords).toHaveLength(30)
+    expect(expandedRecords[26]?.id).toBe("1")
+    expect(expandedRecords[29]?.id).toBe("4")
   })
 })

@@ -10,7 +10,7 @@ import {
   UnsignedByteType,
 } from "three"
 
-import { createPlaceholderSphereRecord, normalizeSphereImageRecords } from "./constants"
+import { expandSphereImageRecords } from "./constants"
 import { loadSphereImageRecord, type ImageLoaderLike } from "./image-loader"
 import type { SphereImageRecord } from "./types"
 
@@ -43,6 +43,13 @@ interface AtlasBuildTarget {
   resource: SphereAtlasResource
   context: CanvasRenderingContext2D | null
   dispose: () => void
+}
+
+function getTileCoordinates(layout: AtlasLayout, tileSize: number, index: number) {
+  return {
+    x: (index % layout.columns) * tileSize,
+    y: Math.floor(index / layout.columns) * tileSize,
+  }
 }
 
 function configureTexture(texture: Texture) {
@@ -89,7 +96,7 @@ function createPlaceholderDataTexture(textureWidth: number, textureHeight: numbe
 }
 
 function createAtlasLayout(records: SphereImageRecord[], tileSize: number): AtlasLayout {
-  const safeRecords = records.length ? records : [createPlaceholderSphereRecord()]
+  const safeRecords = expandSphereImageRecords(records)
   const atlasCount = Math.max(safeRecords.length, 1)
   const columns = Math.ceil(Math.sqrt(atlasCount))
   const rows = Math.ceil(atlasCount / columns)
@@ -161,8 +168,7 @@ function drawCoverImage(
 }
 
 function createAtlasBuildTarget(records: SphereImageRecord[], tileSize: number): AtlasBuildTarget {
-  const normalizedRecords = normalizeSphereImageRecords(records)
-  const safeRecords = normalizedRecords.length ? normalizedRecords : [createPlaceholderSphereRecord()]
+  const safeRecords = expandSphereImageRecords(records)
   const layout = createAtlasLayout(safeRecords, tileSize)
 
   if (typeof document === "undefined") {
@@ -269,16 +275,52 @@ function drawLoadedTile(
   index: number,
   tileSize: number,
 ) {
-  const column = index % layout.columns
-  const row = Math.floor(index / layout.columns)
-  const x = column * tileSize
-  const y = row * tileSize
+  const { x, y } = getTileCoordinates(layout, tileSize, index)
 
   drawCoverImage(context, image, x, y, tileSize)
 }
 
+export function buildAtlasFallbackAssignments(tileCount: number, successfulIndices: number[]) {
+  if (!successfulIndices.length) {
+    return Array.from({ length: tileCount }, () => null)
+  }
+
+  let fallbackCursor = 0
+
+  return Array.from({ length: tileCount }, (_, tileIndex) => {
+    if (successfulIndices.includes(tileIndex)) {
+      return tileIndex
+    }
+
+    const fallbackIndex = successfulIndices[fallbackCursor % successfulIndices.length]
+    fallbackCursor += 1
+
+    return fallbackIndex ?? null
+  })
+}
+
+function fillFailedTilesFromSuccessfulTiles(
+  context: CanvasRenderingContext2D,
+  layout: AtlasLayout,
+  tileSize: number,
+  successfulIndices: number[],
+) {
+  const assignments = buildAtlasFallbackAssignments(layout.tiles.length, successfulIndices)
+
+  assignments.forEach((sourceTileIndex, targetTileIndex) => {
+    if (sourceTileIndex === null || sourceTileIndex === targetTileIndex) {
+      return
+    }
+
+    const source = getTileCoordinates(layout, tileSize, sourceTileIndex)
+    const target = getTileCoordinates(layout, tileSize, targetTileIndex)
+
+    context.drawImage(context.canvas, source.x, source.y, tileSize, tileSize, target.x, target.y, tileSize, tileSize)
+  })
+}
+
 export function useTexturePipeline(records: SphereImageRecord[], options: TexturePipelineOptions) {
-  const normalizedRecords = useMemo(() => normalizeSphereImageRecords(records), [records])
+  const normalizedRecords = useMemo(() => expandSphereImageRecords(records), [records])
   const [atlas, setAtlas] = useState<SphereAtlasResource | null>(null)
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading")
 
@@ -302,7 +344,7 @@ export function useTexturePipeline(records: SphereImageRecord[], options: Textur
     }
 
     let completedCount = 0
-    let successCount = 0
+    const successfulIndices: number[] = []
 
     normalizedRecords.forEach((record, index) => {
       void loadSphereImageRecord(record)
@@ -312,7 +354,8 @@ export function useTexturePipeline(records: SphereImageRecord[], options: Textur
           }
 
           drawLoadedTile(buildTarget.context as CanvasRenderingContext2D, buildTarget.layout, image, index, options.tileSize)
-          successCount += 1
+          successfulIndices.push(index)
+
           updateScheduler.schedule()
         })
         .catch(() => {})
@@ -327,8 +370,17 @@ export function useTexturePipeline(records: SphereImageRecord[], options: Textur
             return
           }
 
+          if (successfulIndices.length && buildTarget.context) {
+            fillFailedTilesFromSuccessfulTiles(
+              buildTarget.context as CanvasRenderingContext2D,
+              buildTarget.layout,
+              options.tileSize,
+              successfulIndices,
+            )
+          }
+
           updateScheduler.flush()
-          setStatus(successCount > 0 ? "ready" : "error")
+          setStatus(successfulIndices.length > 0 ? "ready" : "error")
         })
     })
 

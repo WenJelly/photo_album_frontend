@@ -1,8 +1,7 @@
-import { memo, startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { memo, startTransition, useCallback, useEffect, useMemo, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import {
-  getAdminPictureDetail,
   listAdminPictures,
   reviewPicture,
   type AdminPictureRecord,
@@ -96,6 +95,7 @@ function mergeAdminPictureRecord(currentRecord: AdminPictureRecord, nextRecord: 
   return {
     ...currentRecord,
     ...nextRecord,
+    thumbnailUrl: currentRecord.thumbnailUrl ?? nextRecord.thumbnailUrl,
     userId: nextRecord.userId ?? currentRecord.userId,
     user: nextRecord.user ?? currentRecord.user,
   }
@@ -184,7 +184,6 @@ const AdminPictureRow = memo(function AdminPictureRow({
 })
 
 export function AdminReviewPage({ currentUserRole }: AdminReviewPageProps) {
-  const detailCacheRef = useRef(new Map<string, AdminPictureRecord>())
   const [filters, setFilters] = useState<ListAdminPicturesParams>(() => buildAdminReviewFilters())
   const [clientPageNum, setClientPageNum] = useState(1)
   const [isClientPaginating, setIsClientPaginating] = useState(false)
@@ -280,13 +279,6 @@ export function AdminReviewPage({ currentUserRole }: AdminReviewPageProps) {
 
   const applyRecordUpdate = useCallback(
     (updatedRecord: AdminPictureRecord) => {
-      const currentRecord =
-        detailCacheRef.current.get(updatedRecord.id) ??
-        (selectedPicture?.id === updatedRecord.id ? selectedPicture : undefined) ??
-        records.find((record) => record.id === updatedRecord.id)
-      const mergedRecord = currentRecord ? mergeAdminPictureRecord(currentRecord, updatedRecord) : updatedRecord
-
-      detailCacheRef.current.set(mergedRecord.id, mergedRecord)
       setRecords((current) => {
         const nextRecords = current.map((record) =>
           record.id === updatedRecord.id ? mergeAdminPictureRecord(record, updatedRecord) : record,
@@ -300,7 +292,7 @@ export function AdminReviewPage({ currentUserRole }: AdminReviewPageProps) {
         current?.id === updatedRecord.id ? mergeAdminPictureRecord(current, updatedRecord) : current,
       )
     },
-    [filters.reviewStatus, records, selectedPicture],
+    [filters.reviewStatus],
   )
 
   const handleStatusFilterChange = useCallback((reviewStatus?: number) => {
@@ -347,30 +339,11 @@ export function AdminReviewPage({ currentUserRole }: AdminReviewPageProps) {
     })
   }, [])
 
-  const handleOpenDetail = useCallback(async (record: AdminPictureRecord) => {
-    const cachedOrCurrentRecord = detailCacheRef.current.get(record.id) ?? record
-
-    setSelectedPicture(cachedOrCurrentRecord)
+  const handleOpenDetail = useCallback((record: AdminPictureRecord) => {
+    setSelectedPicture(record)
     setSelectedPictureError(null)
-    setDetailReviewMessage(cachedOrCurrentRecord.reviewMessage ?? "")
+    setDetailReviewMessage(record.reviewMessage ?? "")
     setActionNotice(null)
-
-    try {
-      const cachedDetail = detailCacheRef.current.get(record.id)
-
-      if (cachedDetail) {
-        return
-      }
-
-      const detail = await getAdminPictureDetail(record.id)
-      const mergedDetail = mergeAdminPictureRecord(cachedOrCurrentRecord, detail)
-
-      detailCacheRef.current.set(mergedDetail.id, mergedDetail)
-      setSelectedPicture(mergedDetail)
-      setDetailReviewMessage(mergedDetail.reviewMessage ?? "")
-    } catch (error) {
-      setSelectedPictureError(error instanceof Error ? error.message : "图片详情暂时无法加载。")
-    }
   }, [])
 
   const submitReviewAction = useCallback(
@@ -469,7 +442,6 @@ export function AdminReviewPage({ currentUserRole }: AdminReviewPageProps) {
       const deletedPicture = await deletePicture(selectedPicture.id)
       const deletedId = deletedPicture.id
 
-      detailCacheRef.current.delete(deletedId)
       setRecords((current) => current.filter((record) => record.id !== deletedId))
       setSelectedIds((current) => current.filter((id) => id !== deletedId))
       setSelectedPicture(null)

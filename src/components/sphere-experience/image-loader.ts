@@ -8,12 +8,8 @@ export interface ImageLoaderLike {
   height: number
 }
 
-export function loadSphereImageRecord(record: SphereImageRecord, priority: "auto" | "low" = "auto") {
-  if (!record.imageUrl || typeof Image === "undefined") {
-    return Promise.reject(new Error("Image loading unavailable"))
-  }
-
-  const cached = imageCache.get(record.imageUrl)
+function loadImageUrl(url: string, priority: "auto" | "low") {
+  const cached = imageCache.get(url)
 
   if (cached) {
     return cached
@@ -37,15 +33,40 @@ export function loadSphereImageRecord(record: SphereImageRecord, priority: "auto
       resolve(image)
     }
     image.onerror = () => {
-      imageCache.delete(record.imageUrl)
-      reject(new Error(`Failed to load ${record.imageUrl}`))
+      imageCache.delete(url)
+      reject(new Error(`Failed to load ${url}`))
     }
-    image.src = record.imageUrl
+    image.src = url
   })
 
-  imageCache.set(record.imageUrl, imagePromise)
+  imageCache.set(url, imagePromise)
 
   return imagePromise
+}
+
+export function loadSphereImageRecord(record: SphereImageRecord, priority: "auto" | "low" = "auto") {
+  if (typeof Image === "undefined") {
+    return Promise.reject(new Error("Image loading unavailable"))
+  }
+
+  const primaryUrl = record.imageUrl.trim()
+  const fallbackUrl = record.fallbackImageUrl?.trim()
+
+  if (primaryUrl) {
+    return loadImageUrl(primaryUrl, priority).catch((error) => {
+      if (!fallbackUrl || fallbackUrl === primaryUrl) {
+        throw error
+      }
+
+      return loadImageUrl(fallbackUrl, priority)
+    })
+  }
+
+  if (fallbackUrl) {
+    return loadImageUrl(fallbackUrl, priority)
+  }
+
+  return Promise.reject(new Error("Image loading unavailable"))
 }
 
 export function primeImageRecords(records: SphereImageRecord[]) {

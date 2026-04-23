@@ -26,6 +26,7 @@ interface FrameStepResult {
 }
 
 const SETTLING_DURATION_MS = 320
+const AUTO_ROTATION_STEP = 0.035
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
@@ -102,7 +103,7 @@ export function useMotionController({ isVisible, reducedMotion, requestRender }:
     let shouldRender = dirtyRef.current
 
     if (visibilityRef.current && !state.dragging && !reducedMotionRef.current && now >= state.pauseAutoUntil) {
-      state.rotationY += 0.03
+      state.rotationY += AUTO_ROTATION_STEP
       shouldRender = true
     }
 

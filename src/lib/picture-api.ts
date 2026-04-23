@@ -6,6 +6,13 @@ import {
   normalizePictureTags,
 } from "@/lib/backend-picture"
 import { normalizeEntityId } from "@/lib/entity-id"
+import {
+  cloneCompressPictureType,
+  GALLERY_DETAIL_COMPRESS,
+  GALLERY_LIST_COMPRESS,
+  SPHERE_LIST_COMPRESS,
+  type CompressPictureTypePayload,
+} from "@/lib/picture-compress"
 import { normalizePictureDeleteId } from "@/lib/picture-delete"
 import { trimToUndefined } from "@/lib/text"
 import type { Photo } from "@/types/photo"
@@ -51,12 +58,26 @@ export interface DeletePictureResult {
 const DEFAULT_PAGE_NUM = 1
 const DEFAULT_PAGE_SIZE = 20
 const MAX_PAGE_SIZE = 20
+const SPHERE_PAGE_SIZE_MAX = 200
 const UPLOAD_REQUEST_TIMEOUT = 60_000
 
-function buildListPayload(params: ListPicturesParams) {
+function normalizePageSize(pageSize: number | undefined, maxPageSize: number) {
+  if (typeof pageSize !== "number" || !Number.isFinite(pageSize)) {
+    return DEFAULT_PAGE_SIZE
+  }
+
+  return Math.min(Math.max(1, Math.trunc(pageSize)), maxPageSize)
+}
+
+function buildListPayload(
+  params: ListPicturesParams,
+  maxPageSize = MAX_PAGE_SIZE,
+  compressPictureType: CompressPictureTypePayload = GALLERY_LIST_COMPRESS,
+) {
   const payload: Record<string, unknown> = {
     pageNum: params.pageNum ?? DEFAULT_PAGE_NUM,
-    pageSize: Math.min(params.pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE),
+    pageSize: normalizePageSize(params.pageSize, maxPageSize),
+    compressPictureType: cloneCompressPictureType(compressPictureType),
   }
 
   const category = trimToUndefined(params.category)
@@ -91,24 +112,39 @@ function appendOptionalText(formData: FormData, key: string, value?: string | nu
   }
 }
 
-export async function listPictures(params: ListPicturesParams = {}): Promise<ListPicturesResult> {
-  const { data } = await request.post<ApiEnvelope<BackendPicturePage>>(
-    "/api/picture/list/page/vo",
-    buildListPayload(params),
-  )
-  const result = unwrapApiResponse(data)
-
+function mapPicturePageToListResult(result: BackendPicturePage): ListPicturesResult {
   return {
-    pageNum: result.data.pageNum,
-    pageSize: result.data.pageSize,
-    total: result.data.total,
-    list: result.data.list.map(mapBackendPictureToPhoto),
+    pageNum: result.pageNum,
+    pageSize: result.pageSize,
+    total: result.total,
+    list: result.list.map(mapBackendPictureToPhoto),
   }
 }
 
+export async function listPictures(params: ListPicturesParams = {}): Promise<ListPicturesResult> {
+  const { data } = await request.post<ApiEnvelope<BackendPicturePage>>(
+    "/api/picture/list",
+    buildListPayload(params, MAX_PAGE_SIZE, GALLERY_LIST_COMPRESS),
+  )
+  const result = unwrapApiResponse(data)
+
+  return mapPicturePageToListResult(result.data)
+}
+
+export async function listSpherePictures(limit: number): Promise<ListPicturesResult> {
+  const { data } = await request.post<ApiEnvelope<BackendPicturePage>>(
+    "/api/picture/list",
+    buildListPayload({ pageNum: DEFAULT_PAGE_NUM, pageSize: limit }, SPHERE_PAGE_SIZE_MAX, SPHERE_LIST_COMPRESS),
+  )
+  const result = unwrapApiResponse(data)
+
+  return mapPicturePageToListResult(result.data)
+}
+
 export async function getPictureDetail(id: number | string): Promise<Photo> {
-  const { data } = await request.get<ApiEnvelope<BackendPicture>>("/api/picture/get/vo", {
-    params: { id: normalizeEntityId(id, "图片 ID 非法") },
+  const { data } = await request.post<ApiEnvelope<BackendPicture>>("/api/picture/vo", {
+    id: normalizeEntityId(id, "图片 ID 非法"),
+    compressPictureType: cloneCompressPictureType(GALLERY_DETAIL_COMPRESS),
   })
   const result = unwrapApiResponse(data)
 
