@@ -51,7 +51,7 @@ describe("admin-picture-api", () => {
 
     expect(mockedPost).toHaveBeenCalledWith("/api/admin/picture/list", {
       pageNum: 1,
-      pageSize: 20,
+      pageSize: 50,
       reviewStatus: 0,
       compressPictureType: {
         compressType: 2,
@@ -61,5 +61,70 @@ describe("admin-picture-api", () => {
     })
     expect(result.list[0]?.user?.id).toBe("9")
     expect(result.list[0]?.reviewStatus).toBe(0)
+  })
+
+  it("does not force the all-status sentinel when reviewStatus is omitted", async () => {
+    mockedPost.mockResolvedValue({
+      data: {
+        code: 200,
+        data: {
+          pageNum: 1,
+          pageSize: 20,
+          total: 0,
+          list: [],
+        },
+      },
+    })
+
+    await listAdminPictures({ pageNum: 1, pageSize: 20 })
+
+    expect(mockedPost).toHaveBeenCalledWith("/api/admin/picture/list", {
+      pageNum: 1,
+      pageSize: 20,
+      compressPictureType: {
+        compressType: 2,
+        cutWidth: 192,
+        CutHeight: 192,
+      },
+    })
+  })
+
+  it("passes documented admin review filter fields through unchanged", async () => {
+    mockedPost.mockResolvedValue({
+      data: {
+        code: 200,
+        data: {
+          pageNum: 1,
+          pageSize: 20,
+          total: 0,
+          list: [],
+        },
+      },
+    })
+
+    await listAdminPictures({
+      id: "1",
+      userId: "9",
+      reviewerId: "3",
+      tags: ["sunset", "sea"],
+      reviewMessage: "needs review",
+      pageNum: 2,
+      pageSize: 30,
+    })
+
+    expect(mockedPost).toHaveBeenCalledWith("/api/admin/picture/list", {
+      id: "1",
+      userId: "9",
+      reviewerId: "3",
+      tags: ["sunset", "sea"],
+      reviewMessage: "needs review",
+      pageNum: 2,
+      pageSize: 30,
+      compressPictureType: {
+        compressType: 2,
+        cutWidth: 192,
+        CutHeight: 192,
+      },
+    })
   })
 })

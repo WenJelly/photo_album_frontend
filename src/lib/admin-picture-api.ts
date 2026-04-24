@@ -1,6 +1,7 @@
 import request, { unwrapApiResponse, type ApiEnvelope } from "@/lib/request"
 import { normalizeEntityId, stringifyEntityId } from "@/lib/entity-id"
 import { ADMIN_REVIEW_LIST_COMPRESS, cloneCompressPictureType } from "@/lib/picture-compress"
+import { normalizePictureTags } from "@/lib/backend-picture"
 import { trimToUndefined } from "@/lib/text"
 
 export interface AdminPictureUserSummary {
@@ -60,12 +61,24 @@ interface AdminPicturePageEnvelope {
 }
 
 export interface ListAdminPicturesParams {
+  id?: string
+  name?: string
   pageNum?: number
   pageSize?: number
   reviewStatus?: number
   category?: string
+  tags?: string[]
+  picSize?: number
+  picWidth?: number
+  picHeight?: number
+  picScale?: number
+  picFormat?: string
   userId?: string | number
+  reviewerId?: string | number
+  reviewMessage?: string
   searchText?: string
+  editTimeStart?: string
+  editTimeEnd?: string
 }
 
 export interface AdminPicturePage {
@@ -82,9 +95,9 @@ export interface ReviewPictureParams {
 }
 
 const DEFAULT_PAGE_NUM = 1
-const DEFAULT_PAGE_SIZE = 20
-const MAX_PAGE_SIZE = 20
-const FALLBACK_USER_NAME = "未命名用户"
+const DEFAULT_PAGE_SIZE = 10
+const MAX_PAGE_SIZE = 300
+const FALLBACK_USER_NAME = "Unnamed User"
 
 function parseTags(tags?: string[] | string): string[] {
   if (Array.isArray(tags)) {
@@ -97,7 +110,6 @@ function parseTags(tags?: string[] | string): string[] {
 
   try {
     const parsed = JSON.parse(tags) as unknown
-
     return Array.isArray(parsed) ? parsed.map((tag) => String(tag).trim()).filter(Boolean) : []
   } catch {
     return tags
@@ -113,7 +125,7 @@ function mapAdminPictureUserSummary(user?: BackendAdminPictureUserSummary): Admi
   }
 
   return {
-    id: normalizeEntityId(user.id, "用户 ID 非法"),
+    id: normalizeEntityId(user.id, "User ID is invalid"),
     userName: trimToUndefined(user.userName) ?? FALLBACK_USER_NAME,
     userAvatar: trimToUndefined(user.userAvatar),
     userProfile: trimToUndefined(user.userProfile),
@@ -124,7 +136,7 @@ function mapAdminPictureUserSummary(user?: BackendAdminPictureUserSummary): Admi
 function mapAdminPictureRecord(picture: BackendAdminPictureRecord): AdminPictureRecord {
   return {
     ...picture,
-    id: normalizeEntityId(picture.id, "图片 ID 非法"),
+    id: normalizeEntityId(picture.id, "Picture ID is invalid"),
     reviewerId: picture.reviewerId !== undefined ? stringifyEntityId(picture.reviewerId) : undefined,
     tags: parseTags(picture.tags),
     userId: picture.userId !== undefined ? stringifyEntityId(picture.userId) : undefined,
@@ -132,26 +144,85 @@ function mapAdminPictureRecord(picture: BackendAdminPictureRecord): AdminPicture
   }
 }
 
-export async function listAdminPictures(
-  params: ListAdminPicturesParams = {},
-): Promise<AdminPicturePage> {
+export async function listAdminPictures(params: ListAdminPicturesParams = {}): Promise<AdminPicturePage> {
   const payload: Record<string, unknown> = {
     pageNum: params.pageNum ?? DEFAULT_PAGE_NUM,
     pageSize: Math.min(params.pageSize ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE),
-    reviewStatus: params.reviewStatus ?? -1,
     compressPictureType: cloneCompressPictureType(ADMIN_REVIEW_LIST_COMPRESS),
   }
 
-  if (params.category) {
-    payload.category = params.category
+  const id = params.id ? normalizeEntityId(params.id, "Picture ID is invalid") : undefined
+  const name = trimToUndefined(params.name)
+  const category = trimToUndefined(params.category)
+  const tags = normalizePictureTags(params.tags)
+  const picFormat = trimToUndefined(params.picFormat)
+  const reviewMessage = trimToUndefined(params.reviewMessage)
+  const searchText = trimToUndefined(params.searchText)
+  const editTimeStart = trimToUndefined(params.editTimeStart)
+  const editTimeEnd = trimToUndefined(params.editTimeEnd)
+
+  if (id) {
+    payload.id = id
+  }
+
+  if (name) {
+    payload.name = name
+  }
+
+  if (params.reviewStatus !== undefined) {
+    payload.reviewStatus = params.reviewStatus
+  }
+
+  if (category) {
+    payload.category = category
+  }
+
+  if (tags.length) {
+    payload.tags = tags
+  }
+
+  if (typeof params.picSize === "number" && Number.isFinite(params.picSize)) {
+    payload.picSize = params.picSize
+  }
+
+  if (typeof params.picWidth === "number" && Number.isFinite(params.picWidth)) {
+    payload.picWidth = params.picWidth
+  }
+
+  if (typeof params.picHeight === "number" && Number.isFinite(params.picHeight)) {
+    payload.picHeight = params.picHeight
+  }
+
+  if (typeof params.picScale === "number" && Number.isFinite(params.picScale)) {
+    payload.picScale = params.picScale
+  }
+
+  if (picFormat) {
+    payload.picFormat = picFormat
   }
 
   if (params.userId !== undefined) {
     payload.userId = stringifyEntityId(params.userId)
   }
 
-  if (params.searchText) {
-    payload.searchText = params.searchText
+  if (params.reviewerId !== undefined) {
+    payload.reviewerId = stringifyEntityId(params.reviewerId)
+  }
+
+  if (reviewMessage) {
+    payload.reviewMessage = reviewMessage
+  }
+
+  if (searchText) {
+    payload.searchText = searchText
+  }
+
+  if (editTimeStart) {
+    payload.editTimeStart = editTimeStart
+  }
+
+  if (editTimeEnd) {
+    payload.editTimeEnd = editTimeEnd
   }
 
   const { data } = await request.post<ApiEnvelope<AdminPicturePageEnvelope>>("/api/admin/picture/list", payload)

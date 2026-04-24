@@ -42,14 +42,14 @@ describe("picture-api list helpers", () => {
     mockedPost.mockReset()
   })
 
-  it("keeps gallery listing capped at 20 items", async () => {
-    mockedPost.mockResolvedValue({ data: createPicturePage(20) })
+  it("keeps gallery listing capped at the documented 300 items", async () => {
+    mockedPost.mockResolvedValue({ data: createPicturePage(300) })
 
-    await listPictures({ pageNum: 1, pageSize: 200 })
+    await listPictures({ pageNum: 1, pageSize: 400 })
 
     expect(mockedPost).toHaveBeenCalledWith("/api/picture/list", {
       pageNum: 1,
-      pageSize: 20,
+      pageSize: 300,
       compressPictureType: {
         compressType: 1,
       },
@@ -96,5 +96,53 @@ describe("picture-api list helpers", () => {
       },
     })
     expect(mockedGet).not.toHaveBeenCalled()
+  })
+
+  it("passes documented public list filter fields through unchanged", async () => {
+    mockedPost.mockResolvedValue({ data: createPicturePage(10) })
+
+    await listPictures({
+      id: "7",
+      name: "Sunset",
+      userId: "9",
+      picFormat: "jpg",
+      editTimeStart: "2026-04-01",
+      editTimeEnd: "2026-04-23",
+      pageNum: 2,
+      pageSize: 10,
+    })
+
+    expect(mockedPost).toHaveBeenCalledWith("/api/picture/list", {
+      id: "7",
+      name: "Sunset",
+      userId: "9",
+      picFormat: "jpg",
+      editTimeStart: "2026-04-01",
+      editTimeEnd: "2026-04-23",
+      pageNum: 2,
+      pageSize: 10,
+      compressPictureType: {
+        compressType: 1,
+      },
+    })
+  })
+
+  it("treats delete responses without a data field as success for the requested id", async () => {
+    mockedPost.mockResolvedValue({
+      data: {
+        code: 200,
+        message: "success",
+      },
+    })
+
+    const { deletePicture } = await import("./picture-api")
+    const result = await deletePicture("9")
+
+    expect(mockedPost).toHaveBeenCalledWith("/api/picture/delete", {
+      id: "9",
+    })
+    expect(result).toEqual({
+      id: "9",
+    })
   })
 })

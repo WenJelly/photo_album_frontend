@@ -8,7 +8,7 @@ export const DEFAULT_UNAUTHORIZED_MESSAGE = "登录已失效，请重新登录"
 
 export interface ApiEnvelope<T> {
   code?: number
-  data: T
+  data?: T
   message?: string
 }
 
@@ -19,7 +19,6 @@ export interface ApiResult<T> {
 
 const SUCCESS_CODES = new Set([0, 200])
 const LARGE_INTEGER_ID_FIELD_PATTERN = /"(id|userId|reviewerId)"\s*:\s*(-?\d{16,})/g
-const STRINGIFIED_NUMERIC_ID_FIELD_PATTERN = /"(id|userId|reviewerId)"\s*:\s*"(\d+)"/g
 
 export function formatAuthorizationHeader(token: string) {
   const normalizedToken = token.trim()
@@ -52,7 +51,6 @@ function isApiEnvelope<T>(payload: unknown): payload is ApiEnvelope<T> {
   return Boolean(
     payload &&
       typeof payload === "object" &&
-      "data" in payload &&
       ("code" in payload || "message" in payload),
   )
 }
@@ -73,12 +71,7 @@ export function parseApiJsonPayload(payload: string) {
 }
 
 export function stringifyApiJsonPayload(payload: unknown) {
-  const jsonPayload = JSON.stringify(payload)
-
-  return jsonPayload.replace(
-    STRINGIFIED_NUMERIC_ID_FIELD_PATTERN,
-    (_, key: string, value: string) => `"${key}":${value}`,
-  )
+  return JSON.stringify(payload)
 }
 
 function isFormDataPayload(data: unknown) {
@@ -118,7 +111,7 @@ export function unwrapApiResponse<T>(payload: ApiEnvelope<T> | T): ApiResult<T> 
   }
 
   return {
-    data: payload.data,
+    data: payload.data as T,
     message,
   }
 }

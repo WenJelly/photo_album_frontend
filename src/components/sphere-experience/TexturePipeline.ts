@@ -329,12 +329,27 @@ export function useTexturePipeline(records: SphereImageRecord[], options: Textur
     const buildTarget = createAtlasBuildTarget(normalizedRecords, options.tileSize)
     const updateScheduler = createTextureUpdateScheduler(buildTarget.resource.texture, options.onAtlasInvalidate)
 
-    setAtlas(buildTarget.resource)
-    setStatus(normalizedRecords.length ? "loading" : "ready")
+    queueMicrotask(() => {
+      if (cancelled) {
+        return
+      }
+
+      setAtlas(buildTarget.resource)
+
+      if (normalizedRecords.length) {
+        setStatus("loading")
+      }
+    })
 
     if (!normalizedRecords.length || !buildTarget.context) {
       updateScheduler.flush()
-      setStatus("ready")
+      queueMicrotask(() => {
+        if (cancelled) {
+          return
+        }
+
+        setStatus("ready")
+      })
 
       return () => {
         cancelled = true

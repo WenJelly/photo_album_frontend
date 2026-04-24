@@ -20,6 +20,7 @@ vi.mock("./SphereExperienceCanvas", () => ({
   },
 }))
 
+import { SPHERE_PREFETCH_ROOT_MARGIN } from "./constants"
 import { SphereExperienceSection } from "./SphereExperienceSection"
 
 class IntersectionObserverMock {
@@ -78,7 +79,7 @@ function getVisibilityObserver() {
 }
 
 function getPrefetchObserver() {
-  return IntersectionObserverMock.instances.find((observer) => observer.options?.rootMargin === "0px")
+  return IntersectionObserverMock.instances.find((observer) => observer.options?.rootMargin === SPHERE_PREFETCH_ROOT_MARGIN)
 }
 
 describe("SphereExperienceSection", () => {
@@ -93,7 +94,7 @@ describe("SphereExperienceSection", () => {
     vi.unstubAllGlobals()
   })
 
-  it("defers image loading and canvas mount until the section is near the viewport", async () => {
+  it("starts fetching immediately and waits for near-viewport state before mounting the canvas", async () => {
     const dataSource: SphereDataSource = {
       fetchImages: vi.fn().mockResolvedValue([
         createImageRecord({ id: "1" }),
@@ -103,8 +104,13 @@ describe("SphereExperienceSection", () => {
 
     render(<SphereExperienceSection dataSource={dataSource} />)
 
-    expect(dataSource.fetchImages).not.toHaveBeenCalled()
     expect(screen.getByTestId("home-card-sphere")).toHaveAttribute("data-near-viewport", "false")
+    expect(screen.queryByTestId("sphere-experience-canvas")).not.toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(dataSource.fetchImages).toHaveBeenCalledWith({ limit: 200 })
+    })
+
     expect(screen.queryByTestId("sphere-experience-canvas")).not.toBeInTheDocument()
 
     act(() => {
@@ -112,13 +118,40 @@ describe("SphereExperienceSection", () => {
     })
 
     await waitFor(() => {
-      expect(dataSource.fetchImages).toHaveBeenCalledWith({ limit: 200 })
-    })
-
-    await waitFor(() => {
       expect(screen.getByTestId("home-card-sphere")).toHaveAttribute("data-near-viewport", "true")
       expect(screen.getByTestId("sphere-experience-canvas")).toHaveAttribute("data-image-count", "2")
     })
+  })
+
+  it("mounts the canvas on refresh when the section is already near the viewport", async () => {
+    const dataSource: SphereDataSource = {
+      fetchImages: vi.fn().mockResolvedValue([createImageRecord()]),
+    }
+    const getBoundingClientRectSpy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(() => {
+      return {
+        x: 0,
+        y: 120,
+        top: 120,
+        left: 0,
+        right: 1280,
+        bottom: 760,
+        width: 1280,
+        height: 640,
+        toJSON: () => ({}),
+      } as DOMRect
+    })
+
+    render(<SphereExperienceSection dataSource={dataSource} />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId("home-card-sphere")).toHaveAttribute("data-near-viewport", "true")
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId("sphere-experience-canvas")).toHaveAttribute("data-image-count", "1")
+    })
+
+    getBoundingClientRectSpy.mockRestore()
   })
 
   it("propagates visibility changes to the lazy canvas", async () => {

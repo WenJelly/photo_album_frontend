@@ -4,12 +4,10 @@ import { PencilLine, User as UserIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/contexts/auth-context"
 import { preloadImage } from "@/lib/image-preload"
-import { listMyPictures } from "@/lib/my-picture-api"
 import { canDeletePhoto } from "@/lib/photo-permissions"
 import { DELETE_PICTURE_CONFIRM_MESSAGE } from "@/lib/picture-delete"
 import { deletePicture, getPictureDetail, listPictures } from "@/lib/picture-api"
 import { getMyProfile, getUserProfile, updateMyProfile, type UserProfile } from "@/lib/user-api"
-import { cn } from "@/lib/utils"
 import type { Photo } from "@/types/photo"
 
 import { PhotoGrid } from "./PhotoGrid"
@@ -27,13 +25,6 @@ interface UserProfilePageProps {
 const PHOTO_PAGE_SIZE = 20
 const PROFILE_DEFAULT_ERROR = "用户资料暂时无法加载。"
 const PHOTOS_DEFAULT_ERROR = "作品列表暂时无法加载。"
-
-const PRIVATE_REVIEW_FILTERS: Array<{ label: string; value?: number }> = [
-  { label: "全部作品", value: undefined },
-  { label: "待审核", value: 0 },
-  { label: "已通过", value: 1 },
-  { label: "已拒绝", value: 2 },
-]
 
 function getErrorMessage(error: unknown, fallbackMessage: string) {
   return error instanceof Error ? error.message : fallbackMessage
@@ -84,7 +75,6 @@ export function UserProfilePage({ mode, userId, onNavigateToUser }: UserProfileP
   const [photoPageNum, setPhotoPageNum] = useState(1)
   const [photoTotal, setPhotoTotal] = useState(0)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
-  const [activeReviewStatus, setActiveReviewStatus] = useState<number | undefined>(undefined)
   const [actionNotice, setActionNotice] = useState<string | null>(null)
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [draftUserName, setDraftUserName] = useState("")
@@ -203,17 +193,11 @@ export function UserProfilePage({ mode, userId, onNavigateToUser }: UserProfileP
       }
 
       try {
-        const result = isMe
-          ? await listMyPictures({
-              pageNum,
-              pageSize: PHOTO_PAGE_SIZE,
-              reviewStatus: activeReviewStatus,
-            })
-          : await listPictures({
-              pageNum,
-              pageSize: PHOTO_PAGE_SIZE,
-              userId: resolvedUserId,
-            })
+        const result = await listPictures({
+          pageNum,
+          pageSize: PHOTO_PAGE_SIZE,
+          userId: resolvedUserId,
+        })
 
         if (photosRequestIdRef.current !== requestId) {
           return
@@ -246,7 +230,7 @@ export function UserProfilePage({ mode, userId, onNavigateToUser }: UserProfileP
         }
       }
     },
-    [activeReviewStatus, clearSelectedPhoto, isMe, resolvedUserId],
+    [clearSelectedPhoto, resolvedUserId],
   )
 
   const openPhoto = useCallback((photo: Photo) => {
@@ -364,12 +348,18 @@ export function UserProfilePage({ mode, userId, onNavigateToUser }: UserProfileP
       return
     }
 
+    if (!profile) {
+      setProfileFormError("Profile is unavailable")
+      return
+    }
+
     setIsSavingProfile(true)
     setProfileFormError(null)
     setActionNotice(null)
 
     try {
       const nextProfile = await updateMyProfile({
+        id: profile.id,
         userName: draftUserName,
         userAvatar: draftUserAvatar,
         userProfile: draftUserProfile,
@@ -389,7 +379,7 @@ export function UserProfilePage({ mode, userId, onNavigateToUser }: UserProfileP
     } finally {
       setIsSavingProfile(false)
     }
-  }, [draftUserAvatar, draftUserName, draftUserProfile, normalizedDraftUserName, syncDraftProfile, updateUser])
+  }, [draftUserAvatar, draftUserName, draftUserProfile, normalizedDraftUserName, profile, syncDraftProfile, updateUser])
 
   const handleDeletePreviewPhoto = useCallback(async () => {
     if (!previewPhoto) {
@@ -589,30 +579,6 @@ export function UserProfilePage({ mode, userId, onNavigateToUser }: UserProfileP
             当前已加载 {displayedPhotos.length} / {photoTotal} 幅
           </p>
         </div>
-
-        {isMe ? (
-          <div className="flex flex-wrap gap-2">
-            {PRIVATE_REVIEW_FILTERS.map((filter) => {
-              const isActive = filter.value === activeReviewStatus
-
-              return (
-                <button
-                  key={filter.label}
-                  type="button"
-                  onClick={() => setActiveReviewStatus(filter.value)}
-                  className={cn(
-                    "rounded-full px-4 py-2 text-sm font-medium transition",
-                    isActive
-                      ? "bg-foreground text-background"
-                      : "border border-border/70 bg-white text-foreground/74 hover:text-foreground",
-                  )}
-                >
-                  {filter.label}
-                </button>
-              )
-            })}
-          </div>
-        ) : null}
 
         {photosLoadState === "loading" ? (
           <div className="rounded-[1.5rem] border border-border/70 bg-card/70 px-6 py-16 text-center text-sm text-muted-foreground">

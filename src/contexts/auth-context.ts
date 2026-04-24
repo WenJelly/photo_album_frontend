@@ -4,7 +4,7 @@ import type { LoginResult } from "@/lib/auth-api"
 
 export interface AuthUser {
   id: string
-  userAccount: string
+  userEmail: string
   userName: string
   userAvatar: string
   userProfile: string
@@ -33,7 +33,24 @@ export function clearStoredAuth() {
 export function readStoredUser(): AuthUser | null {
   try {
     const raw = localStorage.getItem(USER_KEY)
-    return raw ? (JSON.parse(raw) as AuthUser) : null
+    if (!raw) {
+      return null
+    }
+
+    const parsed = JSON.parse(raw) as Partial<AuthUser> & { userAccount?: string }
+
+    if (!parsed.id || !parsed.userName || !parsed.userRole) {
+      return null
+    }
+
+    return {
+      id: parsed.id,
+      userEmail: parsed.userEmail ?? parsed.userAccount ?? "",
+      userName: parsed.userName,
+      userAvatar: parsed.userAvatar ?? "",
+      userProfile: parsed.userProfile ?? "",
+      userRole: parsed.userRole,
+    }
   } catch {
     return null
   }

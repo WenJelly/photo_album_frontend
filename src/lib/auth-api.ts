@@ -14,7 +14,7 @@ export interface RegisterParams {
 export interface LoginResult {
   token: string
   id: string
-  userAccount: string
+  userEmail: string
   userName: string
   userAvatar: string
   userProfile: string

@@ -2,7 +2,12 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react"
 
 import { cn } from "@/lib/utils"
 
-import { normalizeSphereImageRecords, SPHERE_FETCH_LIMIT, SPHERE_PREFETCH_ROOT_MARGIN } from "./constants"
+import {
+  normalizeSphereImageRecords,
+  SPHERE_FETCH_LIMIT,
+  SPHERE_PREFETCH_ROOT_MARGIN,
+  SPHERE_PREFETCH_VIEWPORT_OFFSET_PX,
+} from "./constants"
 import { primeImageRecords } from "./image-loader"
 import type { SphereExperienceSectionProps, SphereImageRecord } from "./types"
 
@@ -14,57 +19,36 @@ function SphereExperiencePlaceholder() {
   return <div className="sphere-experience-loading-shell" aria-hidden="true" />
 }
 
-function queueIdleWork(callback: () => void) {
+function isSectionNearViewport(section: HTMLElement) {
   if (typeof window === "undefined") {
-    return () => {}
+    return true
   }
 
-  if ("requestIdleCallback" in window) {
-    const idleId = window.requestIdleCallback(callback, { timeout: 1800 })
+  const rect = section.getBoundingClientRect()
 
-    return () => {
-      window.cancelIdleCallback(idleId)
-    }
+  if (rect.height <= 0 && rect.width <= 0) {
+    return false
   }
 
-  const timeoutId = globalThis.setTimeout(callback, 1200)
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0
 
-  return () => {
-    globalThis.clearTimeout(timeoutId)
-  }
+  return rect.bottom >= -SPHERE_PREFETCH_VIEWPORT_OFFSET_PX && rect.top <= viewportHeight + SPHERE_PREFETCH_VIEWPORT_OFFSET_PX
 }
 
 export function SphereExperienceSection({ dataSource, onCardClick, className }: SphereExperienceSectionProps) {
   const sectionRef = useRef<HTMLElement | null>(null)
   const [imageRecords, setImageRecords] = useState<SphereImageRecord[]>([])
-  const [shouldWarmResources, setShouldWarmResources] = useState(false)
-  const [isNearViewport, setIsNearViewport] = useState(false)
-  const [isVisible, setIsVisible] = useState(false)
-  const [loadState, setLoadState] = useState<SphereSectionLoadState>("idle")
+  const [isNearViewport, setIsNearViewport] = useState(
+    () => typeof window !== "undefined" && typeof IntersectionObserver !== "function",
+  )
+  const [isVisible, setIsVisible] = useState(
+    () => typeof window !== "undefined" && typeof IntersectionObserver !== "function",
+  )
+  const [loadState, setLoadState] = useState<SphereSectionLoadState>("loading")
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return
-    }
-
-    let cancelIdleWork = () => {}
-
-    const scheduleWarmup = () => {
-      cancelIdleWork = queueIdleWork(() => {
-        setShouldWarmResources(true)
-        void loadSphereExperienceCanvas()
-      })
-    }
-
-    if (document.readyState === "complete") {
-      scheduleWarmup()
-    } else {
-      window.addEventListener("load", scheduleWarmup, { once: true })
-    }
-
-    return () => {
-      window.removeEventListener("load", scheduleWarmup)
-      cancelIdleWork()
+    if (typeof navigator === "undefined" || !/\bjsdom\b/i.test(navigator.userAgent)) {
+      void loadSphereExperienceCanvas()
     }
   }, [])
 
@@ -76,9 +60,13 @@ export function SphereExperienceSection({ dataSource, onCardClick, className }: 
     }
 
     if (typeof IntersectionObserver !== "function") {
-      setIsNearViewport(true)
-      setIsVisible(true)
       return
+    }
+
+    const syncNearViewportState = () => {
+      if (isSectionNearViewport(section)) {
+        setIsNearViewport(true)
+      }
     }
 
     const prefetchObserver = new IntersectionObserver(
@@ -101,25 +89,31 @@ export function SphereExperienceSection({ dataSource, onCardClick, className }: 
 
     prefetchObserver.observe(section)
     visibilityObserver.observe(section)
+    syncNearViewportState()
+
+    let frameId = 0
+
+    if (typeof window.requestAnimationFrame === "function") {
+      frameId = window.requestAnimationFrame(() => {
+        syncNearViewportState()
+      })
+    }
+
+    window.addEventListener("pageshow", syncNearViewportState)
 
     return () => {
+      if (frameId && typeof window.cancelAnimationFrame === "function") {
+        window.cancelAnimationFrame(frameId)
+      }
+
+      window.removeEventListener("pageshow", syncNearViewportState)
       prefetchObserver.disconnect()
       visibilityObserver.disconnect()
     }
   }, [])
 
   useEffect(() => {
-    if ((!shouldWarmResources && !isNearViewport) || loadState === "loading" || loadState === "ready") {
-      return
-    }
-
-    if (loadState === "error" && !isNearViewport) {
-      return
-    }
-
     let cancelled = false
-
-    setLoadState("loading")
 
     void dataSource
       .fetchImages({ limit: SPHERE_FETCH_LIMIT })
@@ -143,22 +137,22 @@ export function SphereExperienceSection({ dataSource, onCardClick, className }: 
     return () => {
       cancelled = true
     }
-  }, [dataSource, isNearViewport, shouldWarmResources])
+  }, [dataSource])
 
   useEffect(() => {
-    if (!imageRecords.length || (!shouldWarmResources && !isNearViewport)) {
+    if (!imageRecords.length) {
       return
     }
 
     primeImageRecords(imageRecords)
-  }, [imageRecords, isNearViewport, shouldWarmResources])
+  }, [imageRecords])
 
   return (
     <section
       ref={sectionRef}
       data-testid="home-card-sphere"
       data-load-state={loadState}
-      data-warm-state={shouldWarmResources ? "warming" : "idle"}
+      data-warm-state="warming"
       data-near-viewport={isNearViewport ? "true" : "false"}
       data-visible={isVisible ? "true" : "false"}
       className={cn("sphere-experience-section", className)}

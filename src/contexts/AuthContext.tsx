@@ -19,7 +19,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(TOKEN_KEY, result.token)
     setUser({
       id: result.id,
-      userAccount: result.userAccount,
+      userEmail: result.userEmail,
       userName: result.userName,
       userAvatar: result.userAvatar,
       userProfile: result.userProfile,

@@ -5,6 +5,7 @@ import { trimToUndefined } from "@/lib/text"
 interface BackendUserProfile {
   id: string | number
   userName?: string
+  userEmail?: string
   userAvatar?: string
   userProfile?: string
   userRole?: string
@@ -19,6 +20,7 @@ interface BackendUserProfile {
 export interface UserProfile {
   id: string
   userName: string
+  userEmail: string
   userAvatar: string
   userProfile: string
   userRole: string
@@ -33,12 +35,15 @@ export interface UserProfile {
 export type MyUserProfile = UserProfile
 
 export interface UpdateMyProfileParams {
-  userAvatar: string
-  userName: string
-  userProfile: string
+  id: string
+  userAvatar?: string
+  userEmail?: string
+  userName?: string
+  userPassword?: string
+  userProfile?: string
 }
 
-const FALLBACK_USER_NAME = "未命名用户"
+const FALLBACK_USER_NAME = "Unnamed User"
 const FALLBACK_USER_ROLE = "user"
 
 function normalizeCount(value?: number | null) {
@@ -47,8 +52,9 @@ function normalizeCount(value?: number | null) {
 
 function mapUserProfile(profile: BackendUserProfile): UserProfile {
   return {
-    id: normalizeEntityId(profile.id, "用户 ID 非法"),
+    id: normalizeEntityId(profile.id, "User ID is invalid"),
     userName: trimToUndefined(profile.userName) ?? FALLBACK_USER_NAME,
+    userEmail: trimToUndefined(profile.userEmail) ?? "",
     userAvatar: trimToUndefined(profile.userAvatar) ?? "",
     userProfile: trimToUndefined(profile.userProfile) ?? "",
     userRole: trimToUndefined(profile.userRole) ?? FALLBACK_USER_ROLE,
@@ -62,15 +68,15 @@ function mapUserProfile(profile: BackendUserProfile): UserProfile {
 }
 
 export async function getMyProfile(): Promise<MyUserProfile> {
-  const { data } = await request.get<ApiEnvelope<BackendUserProfile>>("/api/user/my")
+  const { data } = await request.post<ApiEnvelope<BackendUserProfile>>("/api/user/get/detail", {})
   const result = unwrapApiResponse(data)
 
   return mapUserProfile(result.data)
 }
 
 export async function getUserProfile(id: string): Promise<UserProfile> {
-  const { data } = await request.get<ApiEnvelope<BackendUserProfile>>("/api/user/get/vo", {
-    params: { id: normalizeEntityId(id, "用户 ID 非法") },
+  const { data } = await request.post<ApiEnvelope<BackendUserProfile>>("/api/user/get/detail", {
+    id: normalizeEntityId(id, "User ID is invalid"),
   })
   const result = unwrapApiResponse(data)
 
@@ -78,13 +84,37 @@ export async function getUserProfile(id: string): Promise<UserProfile> {
 }
 
 export async function updateMyProfile(params: UpdateMyProfileParams): Promise<MyUserProfile> {
-  const payload = {
-    userAvatar: params.userAvatar.trim(),
-    userName: params.userName.trim(),
-    userProfile: params.userProfile.trim(),
+  const payload: Record<string, unknown> = {
+    id: normalizeEntityId(params.id, "User ID is invalid"),
   }
 
-  const { data } = await request.patch<ApiEnvelope<BackendUserProfile>>("/api/user/my", payload)
+  const userAvatar = trimToUndefined(params.userAvatar)
+  const userEmail = trimToUndefined(params.userEmail)
+  const userName = trimToUndefined(params.userName)
+  const userPassword = trimToUndefined(params.userPassword)
+  const userProfile = trimToUndefined(params.userProfile)
+
+  if (userAvatar) {
+    payload.userAvatar = userAvatar
+  }
+
+  if (userEmail) {
+    payload.userEmail = userEmail
+  }
+
+  if (userName) {
+    payload.userName = userName
+  }
+
+  if (userPassword) {
+    payload.userPassword = userPassword
+  }
+
+  if (userProfile) {
+    payload.userProfile = userProfile
+  }
+
+  const { data } = await request.post<ApiEnvelope<BackendUserProfile>>("/api/user/update", payload)
   const result = unwrapApiResponse(data)
 
   return mapUserProfile(result.data)

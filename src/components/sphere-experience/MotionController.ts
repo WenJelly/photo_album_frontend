@@ -193,7 +193,7 @@ export function useMotionController({ isVisible, reducedMotion, requestRender }:
   )
 
   const handlePointerUp = useCallback(
-    (_event: ReactPointerEvent<HTMLDivElement>) => {
+    () => {
       const state = pointerStateRef.current
       const now = typeof performance !== "undefined" ? performance.now() : Date.now()
 

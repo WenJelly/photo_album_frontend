@@ -13,12 +13,13 @@
 3. `POST /api/user/get/detail`
 4. `POST /api/user/update`
 5. `POST /api/admin/user/update`
-6. `POST /api/picture/list`
-7. `POST /api/picture/vo`
-8. `POST /api/picture/upload`
-9. `POST /api/picture/upload/url`
-10. `POST /api/picture/delete`
-11. `POST /api/picture/review`
+6. `POST /api/admin/picture/list`
+7. `POST /api/picture/list`
+8. `POST /api/picture/vo`
+9. `POST /api/picture/upload`
+10. `POST /api/picture/upload/url`
+11. `POST /api/picture/delete`
+12. `POST /api/picture/review`
 
 ## 2. 全局约定
 
@@ -298,6 +299,7 @@ YYYY-MM-DD HH:mm:ss
 | `/api/user/get/detail` | `POST` | 是 | 否 | 获取当前用户或指定用户详情和作品统计 |
 | `/api/user/update` | `POST` | 是 | 否 | 修改自己的资料 |
 | `/api/admin/user/update` | `POST` | 是 | 是 | 管理员修改任意用户资料和角色 |
+| `/api/admin/picture/list` | `POST` | 是 | 是 | 管理员获取图片审核列表 |
 | `/api/picture/list` | `POST` | 否 | 否 | 获取公开图片分页列表 |
 | `/api/picture/vo` | `POST` | 是 | 否 | 获取单张图片详情，用于预览 |
 | `/api/picture/upload` | `POST` | 是 | 否 | 本地文件上传图片；传 `id` 时可更新已有图片 |
@@ -652,7 +654,117 @@ Content-Type: application/json
 
 ---
 
-### 5.6 获取公开图片列表
+### 5.6 管理员获取图片审核列表
+
+**接口**
+
+```http
+POST /api/admin/picture/list
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**作用**
+
+管理员分页获取图片审核列表。这个接口服务于审核页，默认返回待审核图片，也支持查已通过、已拒绝和全部状态。
+
+**权限要求**
+
+必须是管理员账号。
+
+**请求体示例**
+
+默认待审核：
+
+```json
+{
+  "pageNum": 1,
+  "pageSize": 20,
+  "compressPictureType": {
+    "compressType": 1
+  }
+}
+```
+
+查看已通过：
+
+```json
+{
+  "reviewStatus": 1,
+  "pageNum": 1,
+  "pageSize": 20
+}
+```
+
+查看全部状态：
+
+```json
+{
+  "reviewStatus": -1,
+  "pageNum": 1,
+  "pageSize": 20
+}
+```
+
+**可用筛选字段**
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | `string` | 图片 ID |
+| `name` | `string` | 图片名称模糊匹配 |
+| `category` | `string` | 分类精确匹配 |
+| `tags` | `string[]` | 标签模糊匹配，可传多个 |
+| `picSize` | `number` | 图片大小精确匹配 |
+| `picWidth` | `number` | 宽度精确匹配 |
+| `picHeight` | `number` | 高度精确匹配 |
+| `picScale` | `number` | 宽高比精确匹配 |
+| `picFormat` | `string` | 格式精确匹配 |
+| `userId` | `string` | 上传者用户 ID |
+| `reviewStatus` | `number` | `0` 待审核，`1` 通过，`2` 拒绝，`-1` 全部状态 |
+| `reviewMessage` | `string` | 审核说明模糊匹配 |
+| `reviewerId` | `string` | 审核人用户 ID |
+| `editTimeStart` | `string` | 编辑时间起点，支持 `YYYY-MM-DD` 或 `YYYY-MM-DD HH:mm:ss` |
+| `editTimeEnd` | `string` | 编辑时间终点，支持 `YYYY-MM-DD` 或 `YYYY-MM-DD HH:mm:ss` |
+| `searchText` | `string` | 同时匹配 `name` 和 `introduction` |
+| `compressPictureType` | `object` | 缩略图策略 |
+| `pageNum` | `number` | 页码，默认 `1` |
+| `pageSize` | `number` | 每页数量，默认 `10`，最大 `300` |
+
+**默认行为**
+
+1. 不传 `reviewStatus` 时，后端默认按 `0` 处理，只返回待审核图片
+2. 传 `reviewStatus = -1` 时，不按审核状态过滤
+3. 列表只返回 `isDelete = 0` 的图片
+
+**成功返回**
+
+返回 `PicturePageResponse`，列表项为完整 `PictureResponse`。
+
+**后端行为**
+
+1. 每条记录都带上传者 `user` 摘要，前端不需要再逐条请求用户信息
+2. 分页按 `id desc` 排序
+3. 支持审核页按状态、上传者、审核人、时间范围等条件筛选
+
+**常见失败**
+
+| 场景 | code | message |
+| --- | --- | --- |
+| 未登录 | `401` | `请先登录` |
+| 非管理员 | `403` | `仅管理员可访问` |
+| `reviewStatus` 非法 | `400` | `reviewStatus 只能是 -1、0、1、2` |
+| `id/userId/reviewerId` 非法 | `400` | `字段必须是正整数` |
+| `pageSize > 300` | `400` | `pageSize 不能超过 300` |
+
+**前端注意**
+
+1. 审核页首屏建议不传 `reviewStatus`，直接拿默认待审核队列
+2. 审核历史可以传 `1`、`2` 或 `-1`
+3. 如果只是表格缩略图展示，建议继续传 `compressType=1`
+
+---
+
+### 5.7 获取公开图片列表
 
 **接口**
 
@@ -772,7 +884,7 @@ Content-Type: application/json
 
 ---
 
-### 5.7 获取单张图片详情
+### 5.8 获取单张图片详情
 
 **接口**
 
@@ -837,7 +949,7 @@ Content-Type: application/json
 
 ---
 
-### 5.8 本地文件上传图片
+### 5.9 本地文件上传图片
 
 **接口**
 
@@ -934,7 +1046,7 @@ Content-Type: multipart/form-data
 
 ---
 
-### 5.9 通过 URL 上传图片
+### 5.10 通过 URL 上传图片
 
 **接口**
 
@@ -1001,7 +1113,7 @@ Content-Type: application/json
 
 ---
 
-### 5.10 删除图片
+### 5.11 删除图片
 
 **接口**
 
@@ -1050,7 +1162,7 @@ Content-Type: application/json
 
 ---
 
-### 5.11 管理员审核图片
+### 5.12 管理员审核图片
 
 **接口**
 
@@ -1152,6 +1264,7 @@ Authorization: Bearer <token>
 
 1. 普通用户修改自己：`/api/user/update`
 2. 管理员修改别人：`/api/admin/user/update`
+3. 管理员审核列表：`/api/admin/picture/list`
 
 ### 6.5 图片编辑要注意审核状态变化
 
@@ -1186,7 +1299,27 @@ await request.post(
 );
 ```
 
-### 7.3 获取公开图片列表
+### 7.3 获取管理员审核列表
+
+```ts
+await request.post(
+  "/api/admin/picture/list",
+  {
+    pageNum: 1,
+    pageSize: 20,
+    compressPictureType: {
+      compressType: 1,
+    },
+  },
+  {
+    headers: {
+      Authorization: `Bearer ${adminToken}`,
+    },
+  }
+);
+```
+
+### 7.4 获取公开图片列表
 
 ```ts
 await request.post("/api/picture/list", {
@@ -1199,7 +1332,7 @@ await request.post("/api/picture/list", {
 });
 ```
 
-### 7.4 获取图片详情
+### 7.5 获取图片详情
 
 ```ts
 await request.post(
@@ -1218,7 +1351,7 @@ await request.post(
 );
 ```
 
-### 7.5 本地文件上传
+### 7.6 本地文件上传
 
 ```ts
 const formData = new FormData();
@@ -1235,7 +1368,7 @@ await request.post("/api/picture/upload", formData, {
 });
 ```
 
-### 7.6 URL 上传
+### 7.7 URL 上传
 
 ```ts
 await request.post(
@@ -1253,7 +1386,7 @@ await request.post(
 );
 ```
 
-### 7.7 删除图片
+### 7.8 删除图片
 
 ```ts
 await request.post(
@@ -1269,7 +1402,7 @@ await request.post(
 );
 ```
 
-### 7.8 管理员审核图片
+### 7.9 管理员审核图片
 
 ```ts
 await request.post(

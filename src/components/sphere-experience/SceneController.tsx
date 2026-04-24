@@ -5,6 +5,7 @@ import { useFrame, useThree } from "@react-three/fiber"
 
 import type { SphereSceneMetrics } from "./types"
 import type { useMotionController } from "./MotionController"
+import { applySceneMetricsToCamera } from "./scene-camera"
 
 interface SceneControllerProps {
   motion: ReturnType<typeof useMotionController>
@@ -34,16 +35,10 @@ export function SceneController({
   }, [invalidate, onInvalidateReady])
 
   useEffect(() => {
-    perspectiveCamera.position.set(0, 0, sceneMetrics.cameraDistance)
-    perspectiveCamera.lookAt(0, 0, 0)
-    perspectiveCamera.near = 0.1
-    perspectiveCamera.far = sceneMetrics.cameraDistance + 3200
-    perspectiveCamera.fov = sceneMetrics.fov
-    perspectiveCamera.updateProjectionMatrix()
-
+    applySceneMetricsToCamera(perspectiveCamera, sceneMetrics)
     gl.setClearAlpha(0)
     invalidate()
-  }, [gl, invalidate, perspectiveCamera, sceneMetrics.cameraDistance, sceneMetrics.fov])
+  }, [gl, invalidate, perspectiveCamera, sceneMetrics])
 
   useEffect(() => {
     const canvas = gl.domElement

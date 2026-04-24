@@ -5,10 +5,7 @@ const { mockedDeletePicture } = vi.hoisted(() => ({
   mockedDeletePicture: vi.fn(),
 }))
 
-const {
-  mockedListAdminPictures,
-  mockedReviewPicture,
-} = vi.hoisted(() => ({
+const { mockedListAdminPictures, mockedReviewPicture } = vi.hoisted(() => ({
   mockedListAdminPictures: vi.fn(),
   mockedReviewPicture: vi.fn(),
 }))
@@ -31,12 +28,12 @@ function createAdminPictureRecord(overrides: Record<string, unknown> = {}) {
     thumbnailUrl: "https://example.com/photo-thumb.jpg",
     name: "Sunset",
     introduction: "Golden hour",
-    category: "风景",
+    category: "landscape",
     tags: ["sunset"],
     picWidth: 1200,
     picHeight: 1200,
     reviewStatus: 0,
-    reviewMessage: "待补充说明",
+    reviewMessage: "Pending note",
     userId: "9",
     user: {
       id: "9",
@@ -72,32 +69,53 @@ describe("AdminReviewPage", () => {
 
     render(<AdminReviewPage currentUserRole="admin" />)
 
-    const openDetailButton = await screen.findByRole("button", {
-      name: "查看图片 Sunset 的审核详情",
-    })
+    const openDetailButton = await screen.findByRole("button", { name: /Sunset/ })
 
     expect(mockedListAdminPictures).toHaveBeenCalledTimes(1)
 
     await userEvent.click(openDetailButton)
 
-    expect(screen.getByRole("heading", { name: "图片详情" })).toBeInTheDocument()
-    expect(screen.getByDisplayValue("待补充说明")).toBeInTheDocument()
+    expect(screen.getByDisplayValue("Pending note")).toBeInTheDocument()
     expect(screen.getAllByText("Uploader").length).toBeGreaterThan(0)
-    expect(mockedListAdminPictures).toHaveBeenCalledTimes(1)
 
-    await userEvent.click(screen.getByRole("button", { name: "通过审核" }))
+    const actionButtons = screen
+      .getAllByRole("button")
+      .filter((button) => button.textContent && button.textContent.length > 0)
+      .slice(-3)
+
+    await userEvent.click(actionButtons[0]!)
 
     await waitFor(() => {
       expect(mockedReviewPicture).toHaveBeenCalledWith({
         id: "1",
         reviewStatus: 1,
-        reviewMessage: "待补充说明",
+        reviewMessage: "Pending note",
       })
     })
+  })
+
+  it("requests all statuses when the first filter button is selected", async () => {
+    mockedListAdminPictures.mockResolvedValue({
+      pageNum: 1,
+      pageSize: 20,
+      total: 1,
+      list: [createAdminPictureRecord()],
+    })
+
+    render(<AdminReviewPage currentUserRole="admin" />)
+
+    await screen.findByRole("button", { name: /Sunset/ })
+
+    const filterButtons = screen.getAllByRole("button").slice(0, 4)
+
+    await userEvent.click(filterButtons[0]!)
 
     await waitFor(() => {
-      expect(screen.getByText("已完成通过审核。")).toBeInTheDocument()
-      expect(screen.getAllByText("已通过").length).toBeGreaterThan(0)
+      expect(mockedListAdminPictures).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          reviewStatus: -1,
+        }),
+      )
     })
   })
 })

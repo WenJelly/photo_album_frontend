@@ -25,7 +25,7 @@ const REVIEW_STATUS_LABELS: Record<number, string> = {
 }
 
 const STATUS_FILTERS: Array<{ label: string; value?: number }> = [
-  { label: "全部", value: undefined },
+  { label: "全部", value: -1 },
   { label: "待审核", value: 0 },
   { label: "已通过", value: 1 },
   { label: "已拒绝", value: 2 },
@@ -52,7 +52,7 @@ function getStatusBadgeClass(reviewStatus?: number) {
 }
 
 function matchesStatusFilter(record: AdminPictureRecord, reviewStatus?: number) {
-  return reviewStatus === undefined || record.reviewStatus === reviewStatus
+  return reviewStatus === undefined || reviewStatus === -1 || record.reviewStatus === reviewStatus
 }
 
 const ADMIN_THUMBNAIL_SIZE = 56
@@ -184,7 +184,7 @@ const AdminPictureRow = memo(function AdminPictureRow({
 })
 
 export function AdminReviewPage({ currentUserRole }: AdminReviewPageProps) {
-  const [filters, setFilters] = useState<ListAdminPicturesParams>(() => buildAdminReviewFilters())
+  const [filters, setFilters] = useState<ListAdminPicturesParams>(() => buildAdminReviewFilters(0))
   const [clientPageNum, setClientPageNum] = useState(1)
   const [isClientPaginating, setIsClientPaginating] = useState(false)
   const [pageState, setPageState] = useState<ReviewPageState>("loading")
@@ -284,7 +284,7 @@ export function AdminReviewPage({ currentUserRole }: AdminReviewPageProps) {
           record.id === updatedRecord.id ? mergeAdminPictureRecord(record, updatedRecord) : record,
         )
 
-        return filters.reviewStatus === undefined
+        return filters.reviewStatus === undefined || filters.reviewStatus === -1
           ? nextRecords
           : nextRecords.filter((record) => matchesStatusFilter(record, filters.reviewStatus))
       })

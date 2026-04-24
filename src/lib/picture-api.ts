@@ -18,12 +18,21 @@ import { trimToUndefined } from "@/lib/text"
 import type { Photo } from "@/types/photo"
 
 export interface ListPicturesParams {
+  id?: string
+  name?: string
   pageNum?: number
   pageSize?: number
   category?: string
   tags?: string[]
+  picSize?: number
+  picWidth?: number
+  picHeight?: number
+  picScale?: number
+  picFormat?: string
   searchText?: string
   userId?: string
+  editTimeStart?: string
+  editTimeEnd?: string
 }
 
 export interface ListPicturesResult {
@@ -56,8 +65,8 @@ export interface DeletePictureResult {
 }
 
 const DEFAULT_PAGE_NUM = 1
-const DEFAULT_PAGE_SIZE = 20
-const MAX_PAGE_SIZE = 20
+const DEFAULT_PAGE_SIZE = 10
+const MAX_PAGE_SIZE = 300
 const SPHERE_PAGE_SIZE_MAX = 200
 const UPLOAD_REQUEST_TIMEOUT = 60_000
 
@@ -80,10 +89,23 @@ function buildListPayload(
     compressPictureType: cloneCompressPictureType(compressPictureType),
   }
 
+  const id = params.id ? normalizeEntityId(params.id, "Picture ID is invalid") : undefined
+  const name = trimToUndefined(params.name)
   const category = trimToUndefined(params.category)
   const searchText = trimToUndefined(params.searchText)
   const tags = normalizePictureTags(params.tags)
-  const userId = params.userId ? normalizeEntityId(params.userId, "用户 ID 非法") : undefined
+  const userId = params.userId ? normalizeEntityId(params.userId, "User ID is invalid") : undefined
+  const picFormat = trimToUndefined(params.picFormat)
+  const editTimeStart = trimToUndefined(params.editTimeStart)
+  const editTimeEnd = trimToUndefined(params.editTimeEnd)
+
+  if (id) {
+    payload.id = id
+  }
+
+  if (name) {
+    payload.name = name
+  }
 
   if (category) {
     payload.category = category
@@ -97,8 +119,36 @@ function buildListPayload(
     payload.userId = userId
   }
 
+  if (typeof params.picSize === "number" && Number.isFinite(params.picSize)) {
+    payload.picSize = params.picSize
+  }
+
+  if (typeof params.picWidth === "number" && Number.isFinite(params.picWidth)) {
+    payload.picWidth = params.picWidth
+  }
+
+  if (typeof params.picHeight === "number" && Number.isFinite(params.picHeight)) {
+    payload.picHeight = params.picHeight
+  }
+
+  if (typeof params.picScale === "number" && Number.isFinite(params.picScale)) {
+    payload.picScale = params.picScale
+  }
+
+  if (picFormat) {
+    payload.picFormat = picFormat
+  }
+
   if (tags.length) {
     payload.tags = tags
+  }
+
+  if (editTimeStart) {
+    payload.editTimeStart = editTimeStart
+  }
+
+  if (editTimeEnd) {
+    payload.editTimeEnd = editTimeEnd
   }
 
   return payload
@@ -143,7 +193,7 @@ export async function listSpherePictures(limit: number): Promise<ListPicturesRes
 
 export async function getPictureDetail(id: number | string): Promise<Photo> {
   const { data } = await request.post<ApiEnvelope<BackendPicture>>("/api/picture/vo", {
-    id: normalizeEntityId(id, "图片 ID 非法"),
+    id: normalizeEntityId(id, "Picture ID is invalid"),
     compressPictureType: cloneCompressPictureType(GALLERY_DETAIL_COMPRESS),
   })
   const result = unwrapApiResponse(data)
@@ -221,7 +271,7 @@ export async function deletePicture(id: number | string): Promise<DeletePictureR
   })
   const result = unwrapApiResponse(data)
 
-  if (typeof result.data === "boolean") {
+  if (result.data === undefined || typeof result.data === "boolean") {
     return { id: normalizedId }
   }
 
