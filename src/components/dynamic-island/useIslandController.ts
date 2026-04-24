@@ -1,0 +1,202 @@
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FocusEvent } from "react"
+
+export type IslandView = "expanded" | "compact" | "task"
+
+interface UseIslandControllerOptions {
+  hasTask: boolean
+  routeKey: string
+}
+
+const HOVER_MEDIA_QUERY = "(hover: hover) and (pointer: fine)"
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)"
+const COMPACT_ENTER_SCROLL_PX = 96
+const EXPANDED_TOP_SCROLL_PX = 40
+const UPWARD_RELEASE_PX = 28
+const DIRECTION_EPSILON_PX = 2
+
+function readMediaQueryMatch(query: string) {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return false
+  }
+
+  return window.matchMedia(query).matches
+}
+
+export function useIslandController({ hasTask, routeKey }: UseIslandControllerOptions) {
+  const rootRef = useRef<HTMLElement | null>(null)
+  const lastScrollYRef = useRef(0)
+  const lastScrollDirectionRef = useRef<"up" | "down" | null>(null)
+  const upwardReleaseStartRef = useRef<number | null>(null)
+  const compactPreferenceRef = useRef(false)
+  const scrollFrameRef = useRef<number | null>(null)
+  const [canHover, setCanHover] = useState(() => readMediaQueryMatch(HOVER_MEDIA_QUERY))
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(() => readMediaQueryMatch(REDUCED_MOTION_QUERY))
+  const [prefersCompact, setPrefersCompact] = useState(false)
+  const [isHoverExpanded, setIsHoverExpanded] = useState(false)
+  const [isFocusExpanded, setIsFocusExpanded] = useState(false)
+  const [isManualExpanded, setIsManualExpanded] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return
+    }
+
+    const mediaQuery = window.matchMedia(HOVER_MEDIA_QUERY)
+    const update = () => setCanHover(mediaQuery.matches)
+
+    update()
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", update)
+      return () => mediaQuery.removeEventListener("change", update)
+    }
+
+    mediaQuery.addListener(update)
+    return () => mediaQuery.removeListener(update)
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return
+    }
+
+    const mediaQuery = window.matchMedia(REDUCED_MOTION_QUERY)
+    const update = () => setPrefersReducedMotion(mediaQuery.matches)
+
+    update()
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", update)
+      return () => mediaQuery.removeEventListener("change", update)
+    }
+
+    mediaQuery.addListener(update)
+    return () => mediaQuery.removeListener(update)
+  }, [])
+
+  const syncCompactPreference = useCallback((nextScrollY: number, options?: { reset?: boolean }) => {
+    const previousScrollY = options?.reset ? nextScrollY : lastScrollYRef.current
+    const delta = nextScrollY - previousScrollY
+
+    if (options?.reset) {
+      lastScrollDirectionRef.current = null
+      upwardReleaseStartRef.current = null
+    } else if (delta >= DIRECTION_EPSILON_PX) {
+      lastScrollDirectionRef.current = "down"
+      upwardReleaseStartRef.current = null
+    } else if (delta <= -DIRECTION_EPSILON_PX) {
+      lastScrollDirectionRef.current = "up"
+
+      if (upwardReleaseStartRef.current === null) {
+        upwardReleaseStartRef.current = previousScrollY
+      }
+    }
+
+    let nextCompactPreference = compactPreferenceRef.current
+
+    if (nextScrollY <= EXPANDED_TOP_SCROLL_PX) {
+      nextCompactPreference = false
+      upwardReleaseStartRef.current = null
+    } else if (!nextCompactPreference) {
+      if (nextScrollY >= COMPACT_ENTER_SCROLL_PX && lastScrollDirectionRef.current === "down") {
+        nextCompactPreference = true
+      }
+    } else {
+      const upwardReleaseDistance =
+        upwardReleaseStartRef.current === null ? 0 : upwardReleaseStartRef.current - nextScrollY
+
+      if (upwardReleaseDistance >= UPWARD_RELEASE_PX) {
+        nextCompactPreference = false
+        upwardReleaseStartRef.current = null
+      }
+    }
+
+    compactPreferenceRef.current = nextCompactPreference
+    setPrefersCompact(nextCompactPreference)
+
+    if (!nextCompactPreference) {
+      setIsManualExpanded(false)
+    }
+
+    lastScrollYRef.current = nextScrollY
+  }, [])
+
+  useLayoutEffect(() => {
+    const nextScrollY = typeof window !== "undefined" ? window.scrollY : 0
+
+    setIsHoverExpanded(false)
+    setIsFocusExpanded(false)
+    setIsManualExpanded(false)
+    compactPreferenceRef.current = false
+    lastScrollYRef.current = nextScrollY
+    lastScrollDirectionRef.current = null
+    upwardReleaseStartRef.current = null
+    syncCompactPreference(nextScrollY, { reset: true })
+  }, [routeKey, syncCompactPreference])
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return
+    }
+
+    const scheduleSync = () => {
+      if (scrollFrameRef.current !== null) {
+        return
+      }
+
+      scrollFrameRef.current = window.requestAnimationFrame(() => {
+        scrollFrameRef.current = null
+        syncCompactPreference(window.scrollY)
+      })
+    }
+
+    scheduleSync()
+
+    window.addEventListener("scroll", scheduleSync, { passive: true })
+    return () => {
+      window.removeEventListener("scroll", scheduleSync)
+
+      if (scrollFrameRef.current !== null) {
+        window.cancelAnimationFrame(scrollFrameRef.current)
+        scrollFrameRef.current = null
+      }
+    }
+  }, [routeKey, syncCompactPreference])
+
+  const isInteractionExpanded = canHover
+    ? isHoverExpanded || isFocusExpanded
+    : isManualExpanded || isFocusExpanded
+  const view: IslandView = hasTask ? "task" : prefersCompact && !isInteractionExpanded ? "compact" : "expanded"
+
+  return {
+    canHover,
+    prefersReducedMotion,
+    rootRef,
+    view,
+    onBlurCapture(event: FocusEvent<HTMLElement>) {
+      if (!rootRef.current?.contains(event.relatedTarget as Node | null)) {
+        setIsFocusExpanded(false)
+      }
+    },
+    onCompactToggle() {
+      if (canHover) {
+        return
+      }
+
+      setIsManualExpanded((current) => !current)
+    },
+    onFocusCapture() {
+      setIsFocusExpanded(true)
+    },
+    onMouseEnter() {
+      if (canHover) {
+        setIsHoverExpanded(true)
+      }
+    },
+    onMouseLeave() {
+      if (canHover) {
+        setIsHoverExpanded(false)
+      }
+    },
+  }
+}

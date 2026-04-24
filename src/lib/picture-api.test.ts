@@ -15,7 +15,7 @@ vi.mock("./request", async () => {
   }
 })
 
-import { getPictureDetail, listPictures, listSpherePictures } from "./picture-api"
+import { getPictureDetail, listPictures, listSpherePictures, uploadPictureFile } from "./picture-api"
 
 function createPicturePage(pageSize: number) {
   return {
@@ -144,5 +144,52 @@ describe("picture-api list helpers", () => {
     expect(result).toEqual({
       id: "9",
     })
+  })
+
+  it("passes normalized upload progress through the file upload helper", async () => {
+    const onProgress = vi.fn()
+
+    mockedPost.mockImplementation(async (_url, _formData, config) => {
+      config?.onUploadProgress?.({
+        loaded: 512,
+        total: 1024,
+        progress: 0.5,
+      })
+
+      return {
+        data: {
+          code: 200,
+          data: {
+            id: "1",
+            url: "https://example.com/photo.jpg",
+            thumbnailUrl: "https://example.com/photo-thumb.jpg",
+            name: "Photo",
+          },
+        },
+      }
+    })
+
+    await uploadPictureFile({
+      file: new File(["binary"], "demo.png", { type: "image/png" }),
+      picName: "Demo",
+      onProgress,
+    })
+
+    expect(onProgress).toHaveBeenCalledWith({
+      loaded: 512,
+      total: 1024,
+      progress: 0.5,
+    })
+    expect(mockedPost).toHaveBeenCalledWith(
+      "/api/picture/upload",
+      expect.any(FormData),
+      expect.objectContaining({
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+        timeout: 60_000,
+        onUploadProgress: expect.any(Function),
+      }),
+    )
   })
 })

@@ -10,7 +10,6 @@ interface PhotoGridProps {
   photos: Photo[]
   onPhotoClick?: (photo: Photo) => void
   onPhotographerClick?: (photo: Photo) => void
-  onClearFilter?: () => void
 }
 
 function useContainerWidth() {
@@ -34,7 +33,7 @@ function useContainerWidth() {
   return { setElement, width }
 }
 
-export function PhotoGrid({ photos, onPhotoClick, onPhotographerClick, onClearFilter }: PhotoGridProps) {
+export function PhotoGrid({ photos, onPhotoClick, onPhotographerClick }: PhotoGridProps) {
   const { setElement, width } = useContainerWidth()
   const gap = width < 768 ? 6 : 10
   const targetRowHeight = width < 640 ? 216 : width < 1024 ? 258 : 314
@@ -54,20 +53,11 @@ export function PhotoGrid({ photos, onPhotoClick, onPhotographerClick, onClearFi
   if (!photos.length) {
     return (
       <div className="border border-dashed border-border/80 bg-card/60 px-6 py-16 text-center md:px-10">
-        <p className="eyebrow-label">暂无匹配作品</p>
-        <h4 className="mt-4 text-2xl font-medium tracking-[-0.04em]">当前筛选条件下还没有可浏览的作品。</h4>
+        <p className="eyebrow-label">No Works Yet</p>
+        <h4 className="mt-4 text-2xl font-medium tracking-[-0.04em]">The gallery is empty right now.</h4>
         <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-          回到全部分类后，可以继续浏览更完整的影像集合。
+          New images will appear here once they are available.
         </p>
-        {onClearFilter ? (
-          <button
-            type="button"
-            onClick={onClearFilter}
-            className="mt-6 inline-flex rounded-full border border-border bg-background px-5 py-2.5 text-sm transition-colors hover:bg-secondary"
-          >
-            清除筛选
-          </button>
-        ) : null}
       </div>
     )
   }
@@ -118,7 +108,7 @@ const PhotoCard = memo(function PhotoCard({
 
   return (
     <article
-      className="group relative overflow-hidden rounded-none bg-muted/60"
+      className="group relative overflow-hidden rounded-[0.7rem] bg-muted/60"
       style={{ flex: `${photo.width / photo.height} 0 0` }}
     >
       <button
