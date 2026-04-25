@@ -1,5 +1,4 @@
 import { AnimatePresence, motion } from "framer-motion"
-import { useLayoutEffect, useState } from "react"
 
 import { useAuth } from "@/contexts/auth-context"
 import { cn } from "@/lib/utils"
@@ -21,6 +20,7 @@ interface ExhibitionHeaderProps {
   onHomeClick: () => void
   onLoginClick: () => void
   onMyProfileClick: () => void
+  onPreviewTaskPhoto: () => void
   onRunStressDemo: () => void
   onToggleTaskTerminal: () => void
   onUploadClick: () => void
@@ -60,6 +60,7 @@ export function ExhibitionHeader({
   onHomeClick,
   onLoginClick,
   onMyProfileClick,
+  onPreviewTaskPhoto,
   onRunStressDemo,
   onToggleTaskTerminal,
   onUploadClick,
@@ -68,7 +69,6 @@ export function ExhibitionHeader({
   variant,
 }: ExhibitionHeaderProps) {
   const { user, isLoggedIn, logout } = useAuth()
-  const [layoutEnabled, setLayoutEnabled] = useState(true)
   const {
     onBlurCapture,
     onCompactToggle,
@@ -79,16 +79,6 @@ export function ExhibitionHeader({
     rootRef,
     view,
   } = useIslandController({ hasTask: task !== null, routeKey })
-
-  useLayoutEffect(() => {
-    setLayoutEnabled(false)
-
-    const frameId = window.requestAnimationFrame(() => {
-      setLayoutEnabled(true)
-    })
-
-    return () => window.cancelAnimationFrame(frameId)
-  }, [routeKey])
 
   const shellTransition = prefersReducedMotion ? reducedMotionTransition : shellSpringTransition
   const innerContentTransition = prefersReducedMotion ? reducedMotionTransition : contentTransition
@@ -123,10 +113,10 @@ export function ExhibitionHeader({
         className="pointer-events-auto"
       >
         <motion.div
-          layout={layoutEnabled}
+          key={routeKey}
+          layout
           data-testid="dynamic-island-shell"
           data-testid-legacy="exhibition-header"
-          data-layout-enabled={String(layoutEnabled)}
           data-shell-layout="true"
           className={cn(
             getIslandWidthClass(view),
@@ -163,6 +153,7 @@ export function ExhibitionHeader({
                 >
                   <IslandTaskPanel
                     onDismiss={onDismissTask}
+                    onPreviewPhoto={onPreviewTaskPhoto}
                     task={task}
                     onToggleTerminal={onToggleTaskTerminal}
                     reducedMotion={prefersReducedMotion}

@@ -15,6 +15,7 @@ import { preloadImage } from "@/lib/image-preload"
 import { DELETE_PICTURE_CONFIRM_MESSAGE } from "@/lib/picture-delete"
 import { canDeletePhoto } from "@/lib/photo-permissions"
 import { deletePicture, getPictureDetail, listPictures } from "@/lib/picture-api"
+import type { UploadProgressSnapshot } from "@/lib/upload-progress"
 import { cn } from "@/lib/utils"
 import type { IslandTask, UploadTaskEvent } from "@/types/island-task"
 import type { Photo } from "@/types/photo"
@@ -35,10 +36,17 @@ const USER_PROFILE_PATH_PREFIX = "/users"
 const DEFAULT_GALLERY_ERROR = "Gallery is temporarily unavailable. Please try again later."
 const HOME_HEADER_OBSERVER_OFFSET_PX = 56
 const TASK_RESULT_LINGER_MS = 2600
+const UPLOAD_RESULT_LINGER_MS = 6500
+const UPLOAD_FAILURE_LINGER_MS = 5000
 const MAX_TASK_LOGS = 6
+const UPLOAD_TRANSFER_PROGRESS_CAP = 0.8
 
 function appendTaskLog(logs: string[], nextLine: string) {
   return [...logs, nextLine].slice(-MAX_TASK_LOGS)
+}
+
+function appendTaskLogIfChanged(logs: string[], nextLine: string) {
+  return logs.at(-1) === nextLine ? logs : appendTaskLog(logs, nextLine)
 }
 
 function formatBytes(value: number) {
@@ -112,6 +120,66 @@ function getErrorMessage(error: unknown, fallbackMessage: string) {
   return error instanceof Error ? error.message : fallbackMessage
 }
 
+function formatUploadFailureSummary(message: string) {
+  return `上传未完成：${message}`
+}
+
+function clampTaskProgress(value: number) {
+  return Math.min(Math.max(value, 0), 1)
+}
+
+function isUploadTransferComplete(progress: UploadProgressSnapshot) {
+  if (typeof progress.total === "number" && progress.total > 0 && progress.loaded >= progress.total) {
+    return true
+  }
+
+  return typeof progress.progress === "number" && progress.progress >= 0.995
+}
+
+function getUploadTaskPresentation(progress: UploadProgressSnapshot) {
+  if (progress.progress === null) {
+    return {
+      phase: "transferring" as const,
+      progress: null,
+      title: "发送文件",
+      summary: `已发送 ${formatBytes(progress.loaded)}`,
+      logLine: null,
+      metric: undefined,
+    }
+  }
+
+  const normalizedProgress = clampTaskProgress(progress.progress)
+
+  if (isUploadTransferComplete(progress)) {
+    return {
+      phase: "processing" as const,
+      progress: null,
+      title: "服务器处理中",
+      summary: "文件已发送完成，正在等待服务器确认。",
+      logLine: "[server] processing upload",
+      metric: {
+        label: "阶段",
+        value: "处理中",
+      },
+    }
+  }
+
+  return {
+    phase: "transferring" as const,
+    progress: Math.min(normalizedProgress * UPLOAD_TRANSFER_PROGRESS_CAP, UPLOAD_TRANSFER_PROGRESS_CAP),
+    title: "发送文件",
+    summary: `已发送 ${formatBytes(progress.loaded)} / ${formatBytes(progress.total ?? 0)}`,
+    logLine: `[upload] ${Math.round(normalizedProgress * 100)}% @ ${formatBytes(progress.loaded)}`,
+    metric:
+      typeof progress.total === "number" && progress.total > 0
+        ? {
+            label: "文件",
+            value: `${formatBytes(progress.loaded)}/${formatBytes(progress.total)}`,
+          }
+        : undefined,
+  }
+}
+
 function AppShell() {
   const initialRoute = getRouteFromPathname(window.location.pathname)
   const islandTaskHideTimeoutRef = useRef<number | null>(null)
@@ -149,6 +217,7 @@ function AppShell() {
     [galleryPhotos, selectedPhotoId],
   )
   const previewPhoto = selectedPhotoDetail ?? selectedPhoto
+  const previewPhotos = selectedPhoto ? galleryPhotos : previewPhoto ? [previewPhoto] : galleryPhotos
   const canDeletePreviewPhoto = canDeletePhoto(user, previewPhoto)
   const shouldShowGrid = galleryPhotos.length > 0 || galleryLoadState === "ready"
 
@@ -167,12 +236,12 @@ function AppShell() {
     stressDemoTimeoutsRef.current = []
   }, [])
 
-  const scheduleTaskDismiss = useCallback(() => {
+  const scheduleTaskDismiss = useCallback((delayMs = TASK_RESULT_LINGER_MS) => {
     clearTaskHideTimeout()
     islandTaskHideTimeoutRef.current = window.setTimeout(() => {
       setIslandTask((currentTask) => (currentTask?.status === "running" ? currentTask : null))
       islandTaskHideTimeoutRef.current = null
-    }, TASK_RESULT_LINGER_MS)
+    }, delayMs)
   }, [clearTaskHideTimeout])
 
   useEffect(() => {
@@ -468,17 +537,18 @@ function AppShell() {
         setIslandTask({
           id: createTaskId("upload"),
           type: "upload",
+          phase: event.mode === "file" ? "transferring" : "processing",
           status: "running",
-          title: event.mode === "file" ? "Uploading asset" : "Importing remote asset",
-          summary: event.label,
+          title: event.mode === "file" ? "发送文件" : "服务器处理中",
+          summary: event.mode === "file" ? `准备上传 ${event.label}` : `正在导入 ${event.label}`,
           progress: event.mode === "file" ? 0 : null,
           logs: [
-            `[upload] boot sequence armed`,
+            `[upload] task started`,
             `[upload] source ${event.mode === "file" ? "file" : "url"} -> ${event.label}`,
           ],
           metric: {
-            label: "Mode",
-            value: event.mode === "file" ? "FILE" : "URL",
+            label: "方式",
+            value: event.mode === "file" ? "本地文件" : "远程地址",
           },
           terminalOpen: false,
         })
@@ -491,68 +561,65 @@ function AppShell() {
             return currentTask
           }
 
-          const percent = event.progress.progress === null ? null : Math.round(event.progress.progress * 100)
-          const progressSummary =
-            percent === null
-              ? `Streaming ${formatBytes(event.progress.loaded)}`
-              : `Streaming ${formatBytes(event.progress.loaded)} of ${formatBytes(event.progress.total ?? 0)}`
+          const nextTaskPresentation = getUploadTaskPresentation(event.progress)
 
           return {
             ...currentTask,
-            progress: event.progress.progress,
-            summary: progressSummary,
-            logs:
-              percent === null
-                ? currentTask.logs
-                : appendTaskLog(currentTask.logs, `[upload] ${percent}% @ ${formatBytes(event.progress.loaded)}`),
-            metric:
-              typeof event.progress.total === "number" && event.progress.total > 0
-                ? {
-                    label: "Payload",
-                    value: `${formatBytes(event.progress.loaded)}/${formatBytes(event.progress.total)}`,
-                  }
-                : currentTask.metric,
+            phase: nextTaskPresentation.phase,
+            title: nextTaskPresentation.title,
+            progress: nextTaskPresentation.progress,
+            summary: nextTaskPresentation.summary,
+            logs: nextTaskPresentation.logLine
+              ? appendTaskLogIfChanged(currentTask.logs, nextTaskPresentation.logLine)
+              : currentTask.logs,
+            metric: nextTaskPresentation.metric ?? currentTask.metric,
           }
         })
         return
       }
 
       if (event.type === "success") {
+        const isPublished = event.photo.reviewStatus === 1
+
         setIslandTask((currentTask) => ({
           id: currentTask?.id ?? createTaskId("upload"),
           type: "upload",
+          phase: isPublished ? "published" : "pendingReview",
           status: "success",
-          title: "Upload complete",
-          summary: event.photo.reviewStatus === 1 ? "Published to gallery." : "Submitted for review.",
+          title: isPublished ? "已发布" : "等待审核",
+          summary: isPublished ? "作品已发布到图库。" : "作品已提交审核，通过后会出现在图库。",
           progress: 1,
           logs: appendTaskLog(
             currentTask?.logs ?? [],
-            event.photo.reviewStatus === 1 ? "[review] artifact promoted to gallery" : "[review] pending moderation queue",
+            isPublished ? "[review] published to gallery" : "[review] pending moderation queue",
           ),
           metric: {
-            label: "Review",
-            value: event.photo.reviewStatus === 1 ? "LIVE" : "PENDING",
+            label: "结果",
+            value: isPublished ? "已发布" : "待审核",
           },
+          previewPhoto: event.photo,
           terminalOpen: currentTask?.terminalOpen ?? false,
         }))
-        scheduleTaskDismiss()
+        scheduleTaskDismiss(UPLOAD_RESULT_LINGER_MS)
         return
       }
 
       setIslandTask((currentTask) => ({
         id: currentTask?.id ?? createTaskId("upload"),
         type: "upload",
+        phase: "failed",
         status: "error",
-        title: "Upload failed",
-        summary: event.message,
-        progress: currentTask?.progress ?? null,
+        title: "上传失败",
+        summary: formatUploadFailureSummary(event.message),
+        progress: null,
         logs: appendTaskLog(currentTask?.logs ?? [], `[error] ${event.message}`),
         metric: {
-          label: "State",
-          value: "ERROR",
+          label: "状态",
+          value: "失败",
         },
         terminalOpen: currentTask?.terminalOpen ?? false,
       }))
+      scheduleTaskDismiss(UPLOAD_FAILURE_LINGER_MS)
     },
     [clearStressDemoTimeouts, clearTaskHideTimeout, scheduleTaskDismiss],
   )
@@ -646,9 +713,25 @@ function AppShell() {
     clearSelectedPhoto()
 
     if (photo.reviewStatus === 1) {
-      requestGalleryLoad(photo.id)
+      requestGalleryLoad()
     }
   }, [clearSelectedPhoto, requestGalleryLoad])
+
+  const handlePreviewTaskPhoto = useCallback(() => {
+    const photo = islandTask?.type === "upload" ? islandTask.previewPhoto : undefined
+
+    if (!photo) {
+      return
+    }
+
+    clearSelectedPhoto()
+    photoDetailCacheRef.current.set(photo.id, photo)
+    setSelectedPhotoDetail(photo)
+    setSelectedPhotoError(null)
+    setIsPreviewLoading(false)
+    setSelectedPhotoId(photo.id)
+    preloadImage(photo.src)
+  }, [clearSelectedPhoto, islandTask])
 
   const handleDeletePreviewPhoto = useCallback(async () => {
     if (!previewPhoto) {
@@ -689,6 +772,7 @@ function AppShell() {
         onAdminReviewClick={() => navigateToRoute({ page: "adminReview" })}
         onLoginClick={() => setIsAuthDialogOpen(true)}
         onMyProfileClick={() => navigateToRoute({ page: "me" })}
+        onPreviewTaskPhoto={handlePreviewTaskPhoto}
         onRunStressDemo={handleRunStressDemo}
         onToggleTaskTerminal={handleToggleTaskTerminal}
         onUploadClick={() => setIsUploadDialogOpen(true)}
@@ -752,10 +836,10 @@ function AppShell() {
           onUploaded={handleUploadSuccess}
         />
       ) : null}
-      {currentPage === "gallery" && selectedPhoto && previewPhoto ? (
+      {currentPage === "gallery" && previewPhoto ? (
         <PhotoPreviewOverlay
           photo={previewPhoto}
-          photos={galleryPhotos}
+          photos={previewPhotos}
           canDelete={canDeletePreviewPhoto}
           isDeleting={isDeletingPreviewPhoto}
           isLoading={isPreviewLoading}

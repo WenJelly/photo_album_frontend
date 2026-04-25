@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { useState } from "react"
 
 import { AuthContext, type AuthContextValue, type AuthUser } from "@/contexts/auth-context"
 import type { IslandTask } from "@/types/island-task"
@@ -85,29 +86,52 @@ function renderHeader(options?: {
   task?: IslandTask | null
 }) {
   const authValue = options?.authValue ?? createAuthValue(createUser())
+  const props = {
+    routeKey: options?.routeKey ?? "gallery",
+    canRunStressDemo: false,
+    currentPage: options?.currentPage ?? "gallery",
+    onAdminReviewClick: vi.fn(),
+    onDismissTask: vi.fn(),
+    onGalleryClick: vi.fn(),
+    onHomeClick: vi.fn(),
+    onLoginClick: vi.fn(),
+    onMyProfileClick: vi.fn(),
+    onPreviewTaskPhoto: vi.fn(),
+    onRunStressDemo: vi.fn(),
+    onToggleTaskTerminal: vi.fn(),
+    onUploadClick: vi.fn(),
+    task: options?.task ?? null,
+    variant: "solid" as const,
+  }
 
-  return render(
+  const result = render(
     <AuthContext.Provider value={authValue}>
-      <ExhibitionHeader
-        {...({
-          routeKey: options?.routeKey ?? "gallery",
-        } as { routeKey: string })}
-        canRunStressDemo={false}
-        currentPage={options?.currentPage ?? "gallery"}
-        onAdminReviewClick={vi.fn()}
-        onDismissTask={vi.fn()}
-        onGalleryClick={vi.fn()}
-        onHomeClick={vi.fn()}
-        onLoginClick={vi.fn()}
-        onMyProfileClick={vi.fn()}
-        onRunStressDemo={vi.fn()}
-        onToggleTaskTerminal={vi.fn()}
-        onUploadClick={vi.fn()}
-        task={options?.task ?? null}
-        variant="solid"
-      />
+      <ExhibitionHeader {...props} />
     </AuthContext.Provider>,
   )
+
+  return {
+    ...result,
+    rerenderHeader(nextOptions?: {
+      authValue?: AuthContextValue
+      currentPage?: "home" | "gallery" | "adminReview" | "me" | "user"
+      routeKey?: string
+      task?: IslandTask | null
+    }) {
+      const nextAuthValue = nextOptions?.authValue ?? authValue
+
+      result.rerender(
+        <AuthContext.Provider value={nextAuthValue}>
+          <ExhibitionHeader
+            {...props}
+            routeKey={nextOptions?.routeKey ?? props.routeKey}
+            currentPage={nextOptions?.currentPage ?? props.currentPage}
+            task={nextOptions?.task ?? props.task}
+          />
+        </AuthContext.Provider>,
+      )
+    },
+  }
 }
 
 function getContentFrame(view: "expanded" | "compact" | "task") {
@@ -253,5 +277,178 @@ describe("dynamic island transition frames", () => {
     })
 
     expect(screen.queryByTestId("dynamic-island-logo-anchor")).not.toBeInTheDocument()
+  })
+
+  it("remounts the shell when the route changes from a scrolled compact state", async () => {
+    const { rerenderHeader } = renderHeader({
+      currentPage: "gallery",
+      routeKey: "/gallery",
+    })
+
+    setScrollY(220)
+    fireEvent.scroll(window)
+
+    await waitFor(() => {
+      expect(screen.getByTestId("dynamic-island")).toHaveAttribute("data-view", "compact")
+    })
+
+    const previousShell = screen.getByTestId("dynamic-island-shell")
+
+    rerenderHeader({
+      currentPage: "home",
+      routeKey: "/",
+    })
+
+    expect(screen.getByTestId("dynamic-island")).toHaveAttribute("data-view", "expanded")
+    expect(screen.getByTestId("dynamic-island-shell")).not.toBe(previousShell)
+  })
+
+  it("releases focus-expanded mode after dismissing a finished task panel", async () => {
+    function DismissibleHeader() {
+      const [task, setTask] = useState<IslandTask | null>(createTask({ status: "success" }))
+
+      return (
+        <AuthContext.Provider value={createAuthValue(createUser())}>
+          <ExhibitionHeader
+            routeKey="/gallery"
+            canRunStressDemo={false}
+            currentPage="gallery"
+            onAdminReviewClick={vi.fn()}
+            onDismissTask={() => setTask(null)}
+            onGalleryClick={vi.fn()}
+            onHomeClick={vi.fn()}
+            onLoginClick={vi.fn()}
+            onMyProfileClick={vi.fn()}
+            onPreviewTaskPhoto={vi.fn()}
+            onRunStressDemo={vi.fn()}
+            onToggleTaskTerminal={vi.fn()}
+            onUploadClick={vi.fn()}
+            task={task}
+            variant="solid"
+          />
+        </AuthContext.Provider>
+      )
+    }
+
+    render(<DismissibleHeader />)
+
+    setScrollY(220)
+    fireEvent.scroll(window)
+
+    const dismissButton = screen.getByTestId("island-task-dismiss")
+    dismissButton.focus()
+    expect(dismissButton).toHaveFocus()
+    fireEvent.click(dismissButton)
+
+    await waitFor(() => {
+      expect(screen.getByTestId("dynamic-island")).toHaveAttribute("data-view", "compact")
+    })
+  })
+
+  it("restores directly to compact when an auto-finished task was launched from hover-expanded compact mode", async () => {
+    let finishTask = () => {}
+
+    function AutoFinishedTaskHeader() {
+      const [task, setTask] = useState<IslandTask | null>(null)
+      finishTask = () => setTask(null)
+
+      return (
+        <AuthContext.Provider value={createAuthValue(createUser({ userRole: "admin" }))}>
+          <ExhibitionHeader
+            routeKey="/gallery"
+            canRunStressDemo
+            currentPage="gallery"
+            onAdminReviewClick={vi.fn()}
+            onDismissTask={() => setTask(null)}
+            onGalleryClick={vi.fn()}
+            onHomeClick={vi.fn()}
+            onLoginClick={vi.fn()}
+            onMyProfileClick={vi.fn()}
+            onPreviewTaskPhoto={vi.fn()}
+            onRunStressDemo={() => setTask(createTask({ type: "stress-demo", status: "success" }))}
+            onToggleTaskTerminal={vi.fn()}
+            onUploadClick={vi.fn()}
+            task={task}
+            variant="solid"
+          />
+        </AuthContext.Provider>
+      )
+    }
+
+    render(<AutoFinishedTaskHeader />)
+
+    setScrollY(220)
+    fireEvent.scroll(window)
+
+    await waitFor(() => {
+      expect(screen.getByTestId("dynamic-island")).toHaveAttribute("data-view", "compact")
+    })
+
+    fireEvent.mouseEnter(screen.getByTestId("dynamic-island"))
+
+    await waitFor(() => {
+      expect(screen.getByTestId("dynamic-island")).toHaveAttribute("data-view", "expanded")
+    })
+
+    fireEvent.click(screen.getByTestId("open-stress-demo"))
+
+    expect(screen.getByTestId("dynamic-island")).toHaveAttribute("data-view", "task")
+
+    act(() => {
+      finishTask()
+    })
+
+    expect(screen.getByTestId("dynamic-island")).toHaveAttribute("data-view", "compact")
+  })
+
+  it("restores directly to compact when dismissing a task launched from hover-expanded compact mode", async () => {
+    function DismissibleStressTaskHeader() {
+      const [task, setTask] = useState<IslandTask | null>(null)
+
+      return (
+        <AuthContext.Provider value={createAuthValue(createUser({ userRole: "admin" }))}>
+          <ExhibitionHeader
+            routeKey="/gallery"
+            canRunStressDemo
+            currentPage="gallery"
+            onAdminReviewClick={vi.fn()}
+            onDismissTask={() => setTask(null)}
+            onGalleryClick={vi.fn()}
+            onHomeClick={vi.fn()}
+            onLoginClick={vi.fn()}
+            onMyProfileClick={vi.fn()}
+            onPreviewTaskPhoto={vi.fn()}
+            onRunStressDemo={() => setTask(createTask({ type: "stress-demo", status: "success" }))}
+            onToggleTaskTerminal={vi.fn()}
+            onUploadClick={vi.fn()}
+            task={task}
+            variant="solid"
+          />
+        </AuthContext.Provider>
+      )
+    }
+
+    render(<DismissibleStressTaskHeader />)
+
+    setScrollY(220)
+    fireEvent.scroll(window)
+
+    await waitFor(() => {
+      expect(screen.getByTestId("dynamic-island")).toHaveAttribute("data-view", "compact")
+    })
+
+    fireEvent.mouseEnter(screen.getByTestId("dynamic-island"))
+
+    await waitFor(() => {
+      expect(screen.getByTestId("dynamic-island")).toHaveAttribute("data-view", "expanded")
+    })
+
+    fireEvent.click(screen.getByTestId("open-stress-demo"))
+
+    expect(screen.getByTestId("dynamic-island")).toHaveAttribute("data-view", "task")
+
+    fireEvent.click(screen.getByTestId("island-task-dismiss"))
+
+    expect(screen.getByTestId("dynamic-island")).toHaveAttribute("data-view", "compact")
   })
 })

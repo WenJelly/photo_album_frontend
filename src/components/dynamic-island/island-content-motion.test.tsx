@@ -22,6 +22,7 @@ function createTask(overrides?: Partial<IslandTask>): IslandTask {
   return {
     id: "task-1",
     type: "upload",
+    phase: "transferring",
     status: "running",
     title: "Uploading 3 large archival images to the processing queue",
     summary: "Preparing previews, extracting palette data, and syncing metadata to the gallery timeline.",
@@ -109,6 +110,7 @@ describe("dynamic island content motion constraints", () => {
     render(
       <IslandTaskPanel
         onDismiss={vi.fn()}
+        onPreviewPhoto={vi.fn()}
         onToggleTerminal={vi.fn()}
         reducedMotion={false}
         task={createTask()}
@@ -121,7 +123,55 @@ describe("dynamic island content motion constraints", () => {
     expect(
       screen.getByText("Preparing previews, extracting palette data, and syncing metadata to the gallery timeline."),
     ).toHaveClass("dynamic-island-text-container")
-    expect(screen.getByText("Live")).toHaveClass("dynamic-island-geometry-lock")
+    expect(screen.getByText("上传中")).toHaveClass("dynamic-island-geometry-lock")
     expect(screen.getByRole("button", { name: "Mini Terminal" })).toHaveClass("dynamic-island-geometry-lock")
+  })
+
+  it("renders upload phase labels instead of generic task debug labels", () => {
+    render(
+      <IslandTaskPanel
+        onDismiss={vi.fn()}
+        onPreviewPhoto={vi.fn()}
+        onToggleTerminal={vi.fn()}
+        reducedMotion={false}
+        task={createTask({
+          phase: "processing",
+          progress: null,
+          title: "服务器处理中",
+          summary: "文件已发送完成，正在等待后端确认。",
+          metric: {
+            label: "阶段",
+            value: "处理中",
+          },
+        })}
+      />,
+    )
+
+    expect(screen.getByText("上传任务")).toBeInTheDocument()
+    expect(screen.getByText("处理中", { selector: ".dynamic-island-status" })).toHaveClass(
+      "dynamic-island-geometry-lock",
+    )
+    expect(screen.getAllByText("阶段")).toHaveLength(2)
+    expect(screen.getByText("服务器处理中")).toBeInTheDocument()
+    expect(screen.getByText("处理中...")).toBeInTheDocument()
+  })
+
+  it("renders a stopped progress state for failed uploads instead of an animated indeterminate bar", () => {
+    render(
+      <IslandTaskPanel
+        onDismiss={vi.fn()}
+        onPreviewPhoto={vi.fn()}
+        onToggleTerminal={vi.fn()}
+        reducedMotion={false}
+        task={createTask({
+          phase: "failed",
+          progress: null,
+          status: "error",
+        })}
+      />,
+    )
+
+    expect(screen.getByTestId("island-task-progress-stopped")).toBeInTheDocument()
+    expect(screen.queryByTestId("island-task-progress-indeterminate")).not.toBeInTheDocument()
   })
 })

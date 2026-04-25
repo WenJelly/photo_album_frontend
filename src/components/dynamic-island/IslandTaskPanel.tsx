@@ -7,12 +7,30 @@ import { MiniTerminal } from "./MiniTerminal"
 
 interface IslandTaskPanelProps {
   onDismiss: () => void
+  onPreviewPhoto: () => void
   onToggleTerminal: () => void
   reducedMotion: boolean
   task: IslandTask
 }
 
 function getStatusLabel(task: IslandTask) {
+  if (task.type === "upload") {
+    switch (task.phase) {
+      case "transferring":
+        return "上传中"
+      case "processing":
+        return "处理中"
+      case "published":
+        return "已发布"
+      case "pendingReview":
+        return "待审核"
+      case "failed":
+        return "失败"
+      default:
+        break
+    }
+  }
+
   if (task.status === "success") {
     return "Synced"
   }
@@ -37,10 +55,26 @@ function getStatusTone(task: IslandTask) {
 }
 
 function getTaskEyebrow(task: IslandTask) {
-  return task.type === "upload" ? "Transfer Control" : "Pipeline Console"
+  return task.type === "upload" ? "上传任务" : "Pipeline Console"
 }
 
-function getProgressLabel(progress: number | null) {
+function getProgressMetaLabel(task: IslandTask) {
+  return task.type === "upload" ? "阶段" : "Task Flux"
+}
+
+function getProgressLabel(task: IslandTask, progress: number | null) {
+  if (task.type === "upload" && progress === null) {
+    if (task.phase === "processing") {
+      return "处理中..."
+    }
+
+    if (task.phase === "failed") {
+      return "已停止"
+    }
+
+    return "进行中"
+  }
+
   if (progress === null) {
     return "Live"
   }
@@ -48,9 +82,19 @@ function getProgressLabel(progress: number | null) {
   return `${Math.round(progress * 100)}%`
 }
 
-export function IslandTaskPanel({ onDismiss, onToggleTerminal, reducedMotion, task }: IslandTaskPanelProps) {
+function shouldShowPreviewAction(task: IslandTask) {
+  return (
+    task.type === "upload" &&
+    (task.phase === "published" || task.phase === "pendingReview") &&
+    task.status === "success" &&
+    Boolean(task.previewPhoto)
+  )
+}
+
+export function IslandTaskPanel({ onDismiss, onPreviewPhoto, onToggleTerminal, reducedMotion, task }: IslandTaskPanelProps) {
   const progressValue = task.progress === null ? null : Math.min(Math.max(task.progress, 0), 1)
   const progressScale = progressValue === null ? 0.35 : progressValue
+  const isFailedUpload = task.type === "upload" && task.phase === "failed"
 
   return (
     <div className="dynamic-island-task-panel">
@@ -70,6 +114,16 @@ export function IslandTaskPanel({ onDismiss, onToggleTerminal, reducedMotion, ta
               <span className="dynamic-island-metric__value">{task.metric.value}</span>
             </div>
           ) : null}
+          {shouldShowPreviewAction(task) ? (
+            <button
+              type="button"
+              data-testid="island-task-preview"
+              className="dynamic-island-ghost-button dynamic-island-geometry-lock"
+              onClick={onPreviewPhoto}
+            >
+              预览作品
+            </button>
+          ) : null}
           <button
             type="button"
             data-testid="island-task-terminal-toggle"
@@ -83,7 +137,10 @@ export function IslandTaskPanel({ onDismiss, onToggleTerminal, reducedMotion, ta
               type="button"
               data-testid="island-task-dismiss"
               className="dynamic-island-icon-button dynamic-island-geometry-lock"
-              onClick={onDismiss}
+              onClick={(event) => {
+                event.currentTarget.blur()
+                onDismiss()
+              }}
               aria-label="Dismiss task panel"
             >
               <X className="size-4" />
@@ -94,12 +151,20 @@ export function IslandTaskPanel({ onDismiss, onToggleTerminal, reducedMotion, ta
 
       <div className="dynamic-island-progress">
         <div className="dynamic-island-progress__meta">
-          <span>Task Flux</span>
-          <span>{getProgressLabel(progressValue)}</span>
+          <span>{getProgressMetaLabel(task)}</span>
+          <span>{getProgressLabel(task, progressValue)}</span>
         </div>
         <div className="dynamic-island-progress__track">
-          {progressValue === null ? (
-            <div className="dynamic-island-progress__bar dynamic-island-progress__bar--indeterminate" />
+          {isFailedUpload ? (
+            <div
+              data-testid="island-task-progress-stopped"
+              className="dynamic-island-progress__bar dynamic-island-progress__bar--stopped"
+            />
+          ) : progressValue === null ? (
+            <div
+              data-testid="island-task-progress-indeterminate"
+              className="dynamic-island-progress__bar dynamic-island-progress__bar--indeterminate"
+            />
           ) : (
             <motion.div
               className="dynamic-island-progress__bar"

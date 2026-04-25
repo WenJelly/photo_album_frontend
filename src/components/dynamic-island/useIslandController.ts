@@ -141,6 +141,16 @@ export function useIslandController({ hasTask, routeKey }: UseIslandControllerOp
     syncCompactPreference(nextScrollY, { reset: true })
   }, [routeKey, syncCompactPreference])
 
+  useLayoutEffect(() => {
+    if (!hasTask) {
+      return
+    }
+
+    setIsHoverExpanded(false)
+    setIsFocusExpanded(false)
+    setIsManualExpanded(false)
+  }, [hasTask])
+
   useEffect(() => {
     if (typeof window === "undefined") {
       return
@@ -184,17 +194,21 @@ export function useIslandController({ hasTask, routeKey }: UseIslandControllerOp
       }
     },
     onCompactToggle() {
-      if (canHover) {
+      if (hasTask || canHover) {
         return
       }
 
       setIsManualExpanded((current) => !current)
     },
     onFocusCapture() {
+      if (hasTask) {
+        return
+      }
+
       setIsFocusExpanded(true)
     },
     onMouseEnter() {
-      if (canHover && compactPreferenceRef.current) {
+      if (!hasTask && canHover && compactPreferenceRef.current) {
         setIsHoverExpanded(true)
       }
     },

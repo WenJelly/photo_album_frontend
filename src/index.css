@@ -574,6 +574,12 @@
   animation: dynamic-island-indeterminate 1.3s linear infinite;
 }
 
+.dynamic-island-progress__bar--stopped {
+  width: 100%;
+  background: linear-gradient(90deg, rgba(248, 113, 113, 0.95), rgba(251, 146, 60, 0.78));
+  opacity: 0.78;
+}
+
 .dynamic-island-terminal {
   border-radius: 1.3rem;
   border: 1px solid rgba(148, 163, 184, 0.16);
