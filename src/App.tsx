@@ -14,7 +14,7 @@ import { normalizeEntityId } from "@/lib/entity-id"
 import { preloadImage } from "@/lib/image-preload"
 import { DELETE_PICTURE_CONFIRM_MESSAGE } from "@/lib/picture-delete"
 import { canDeletePhoto } from "@/lib/photo-permissions"
-import { deletePicture, getPictureDetail, listPictures } from "@/lib/picture-api"
+import { deletePicture, getPictureDetail, listPicturesCursor } from "@/lib/picture-api"
 import type { UploadProgressSnapshot } from "@/lib/upload-progress"
 import { cn } from "@/lib/utils"
 import type { IslandTask, UploadTaskEvent } from "@/types/island-task"
@@ -40,6 +40,7 @@ const UPLOAD_RESULT_LINGER_MS = 6500
 const UPLOAD_FAILURE_LINGER_MS = 5000
 const MAX_TASK_LOGS = 6
 const UPLOAD_TRANSFER_PROGRESS_CAP = 0.8
+const GALLERY_CURSOR_PAGE_SIZE = 30
 
 function appendTaskLog(logs: string[], nextLine: string) {
   return [...logs, nextLine].slice(-MAX_TASK_LOGS)
@@ -187,6 +188,7 @@ function AppShell() {
   const photoDetailCacheRef = useRef(new Map<string, Photo>())
   const homeHeroRef = useRef<HTMLElement | null>(null)
   const stressDemoTimeoutsRef = useRef<number[]>([])
+  const galleryMoreSentinelRef = useRef<HTMLDivElement | null>(null)
   const { user, isLoggedIn } = useAuth()
 
   const [route, setRoute] = useState<Route>(initialRoute)
@@ -194,6 +196,9 @@ function AppShell() {
   const [galleryLoadState, setGalleryLoadState] = useState<GalleryLoadState>(
     initialRoute.page === "gallery" ? "loading" : "idle",
   )
+  const [galleryNextCursor, setGalleryNextCursor] = useState("")
+  const [galleryHasMore, setGalleryHasMore] = useState(false)
+  const [isGalleryLoadingMore, setIsGalleryLoadingMore] = useState(false)
   const [galleryError, setGalleryError] = useState<string | null>(null)
   const [galleryNotice, setGalleryNotice] = useState<string | null>(null)
   const [isHomeHeroVisible, setIsHomeHeroVisible] = useState(initialRoute.page === "home")
@@ -262,6 +267,9 @@ function AppShell() {
   const requestGalleryLoad = useCallback((focusPhotoId?: string) => {
     pendingFocusPhotoIdRef.current = focusPhotoId ?? null
     setGalleryError(null)
+    setGalleryNextCursor("")
+    setGalleryHasMore(false)
+    setIsGalleryLoadingMore(false)
     setGalleryLoadState("loading")
   }, [])
 
@@ -402,13 +410,15 @@ function AppShell() {
 
     const run = async () => {
       try {
-        const result = await listPictures({ pageNum: 1, pageSize: 20 })
+        const result = await listPicturesCursor({ pageSize: GALLERY_CURSOR_PAGE_SIZE })
 
         if (isCancelled) {
           return
         }
 
         setGalleryPhotos(result.list)
+        setGalleryNextCursor(result.nextCursor)
+        setGalleryHasMore(result.hasMore)
         setGalleryLoadState("ready")
 
         const focusPhotoId = pendingFocusPhotoIdRef.current
@@ -437,6 +447,89 @@ function AppShell() {
       isCancelled = true
     }
   }, [currentPage, galleryLoadState, openPhoto])
+
+  useEffect(() => {
+    if (
+      currentPage !== "gallery" ||
+      galleryLoadState !== "ready" ||
+      !galleryHasMore ||
+      !galleryNextCursor ||
+      isGalleryLoadingMore
+    ) {
+      return
+    }
+
+    const sentinel = galleryMoreSentinelRef.current
+    if (!sentinel) {
+      return
+    }
+
+    if (typeof IntersectionObserver === "undefined") {
+      const frame = window.requestAnimationFrame(() => setIsGalleryLoadingMore(true))
+
+      return () => window.cancelAnimationFrame(frame)
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          setIsGalleryLoadingMore(true)
+        }
+      },
+      { rootMargin: "1200px 0px" },
+    )
+
+    observer.observe(sentinel)
+
+    return () => observer.disconnect()
+  }, [currentPage, galleryHasMore, galleryLoadState, galleryNextCursor, isGalleryLoadingMore])
+
+  useEffect(() => {
+    if (currentPage !== "gallery" || !isGalleryLoadingMore || !galleryNextCursor) {
+      return
+    }
+
+    let isCancelled = false
+
+    const run = async () => {
+      try {
+        const result = await listPicturesCursor({
+          cursor: galleryNextCursor,
+          pageSize: GALLERY_CURSOR_PAGE_SIZE,
+        })
+
+        if (isCancelled) {
+          return
+        }
+
+        setGalleryPhotos((currentPhotos) => {
+          const seenIds = new Set(currentPhotos.map((photo) => photo.id))
+          const nextPhotos = result.list.filter((photo) => !seenIds.has(photo.id))
+
+          return [...currentPhotos, ...nextPhotos]
+        })
+        setGalleryNextCursor(result.nextCursor)
+        setGalleryHasMore(result.hasMore)
+        setGalleryError(null)
+      } catch (error) {
+        if (isCancelled) {
+          return
+        }
+
+        setGalleryError(getErrorMessage(error, DEFAULT_GALLERY_ERROR))
+      } finally {
+        if (!isCancelled) {
+          setIsGalleryLoadingMore(false)
+        }
+      }
+    }
+
+    void run()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [currentPage, galleryNextCursor, isGalleryLoadingMore])
 
   useEffect(() => {
     if (currentPage !== "gallery" || !selectedPhotoId) {
@@ -808,7 +901,7 @@ function AppShell() {
                   onClick={() => requestGalleryLoad()}
                   className="rounded-full border border-destructive/20 bg-white px-4 py-2 text-sm transition hover:bg-destructive/4"
                 >
-                  闂備焦褰冪粔鐢稿蓟婵犲洤绀夐柣妯煎劋缁?
+                  重试
                 </button>
               </div>
             ) : null}
@@ -818,11 +911,21 @@ function AppShell() {
               </div>
             ) : null}
             {shouldShowGrid ? (
-              <PhotoGrid
-                photos={galleryPhotos}
-                onPhotoClick={openPhoto}
-                onPhotographerClick={handlePhotographerNavigation}
-              />
+              <>
+                <PhotoGrid
+                  photos={galleryPhotos}
+                  onPhotoClick={openPhoto}
+                  onPhotographerClick={handlePhotographerNavigation}
+                />
+                {galleryHasMore || isGalleryLoadingMore ? (
+                  <div
+                    ref={galleryMoreSentinelRef}
+                    className="py-8 text-center text-xs uppercase tracking-[0.18em] text-muted-foreground"
+                  >
+                    {isGalleryLoadingMore ? "Loading more works" : "More works"}
+                  </div>
+                ) : null}
+              </>
             ) : null}
           </section>
         )}

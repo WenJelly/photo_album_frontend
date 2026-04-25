@@ -33,6 +33,7 @@ export interface BackendPicture {
   reviewerId?: string | number
   reviewTime?: string
   picColor?: string
+  blurHash?: string
   viewCount?: number
   likeCount?: number
 }
@@ -86,6 +87,7 @@ export function mapBackendPictureToPhoto(picture: BackendPicture): Photo {
     tags: normalizePictureTags(picture.tags),
     format: trimToUndefined(picture.picFormat)?.toUpperCase(),
     dominantColor: trimToUndefined(picture.picColor),
+    blurHash: trimToUndefined(picture.blurHash),
     viewCount: picture.viewCount ?? 0,
     likeCount: picture.likeCount ?? 0,
     createdAt: trimToUndefined(picture.createTime),

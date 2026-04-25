@@ -43,6 +43,17 @@ export interface ListPicturesResult {
   list: Photo[]
 }
 
+export interface ListPicturesCursorParams extends Omit<ListPicturesParams, "pageNum"> {
+  cursor?: string
+}
+
+export interface ListPicturesCursorResult {
+  pageSize: number
+  hasMore: boolean
+  nextCursor: string
+  list: Photo[]
+}
+
 export interface UploadPictureFileParams {
   file: File
   id?: number | string
@@ -70,6 +81,7 @@ export interface DeletePictureResult {
 const DEFAULT_PAGE_NUM = 1
 const DEFAULT_PAGE_SIZE = 10
 const MAX_PAGE_SIZE = 300
+const CURSOR_PAGE_SIZE_MAX = 60
 const SPHERE_PAGE_SIZE_MAX = 200
 const UPLOAD_REQUEST_TIMEOUT = 60_000
 
@@ -174,6 +186,20 @@ function mapPicturePageToListResult(result: BackendPicturePage): ListPicturesRes
   }
 }
 
+function mapPictureCursorPageToListResult(result: {
+  pageSize: number
+  hasMore: boolean
+  nextCursor?: string
+  list: BackendPicture[]
+}): ListPicturesCursorResult {
+  return {
+    pageSize: result.pageSize,
+    hasMore: result.hasMore,
+    nextCursor: result.nextCursor ?? "",
+    list: result.list.map(mapBackendPictureToPhoto),
+  }
+}
+
 export async function listPictures(params: ListPicturesParams = {}): Promise<ListPicturesResult> {
   const { data } = await request.post<ApiEnvelope<BackendPicturePage>>(
     "/api/picture/list",
@@ -182,6 +208,28 @@ export async function listPictures(params: ListPicturesParams = {}): Promise<Lis
   const result = unwrapApiResponse(data)
 
   return mapPicturePageToListResult(result.data)
+}
+
+export async function listPicturesCursor(params: ListPicturesCursorParams = {}): Promise<ListPicturesCursorResult> {
+  const payload = buildListPayload(params, CURSOR_PAGE_SIZE_MAX, GALLERY_LIST_COMPRESS)
+  delete payload.pageNum
+
+  const cursor = trimToUndefined(params.cursor)
+  if (cursor) {
+    payload.cursor = cursor
+  }
+
+  const { data } = await request.post<
+    ApiEnvelope<{
+      pageSize: number
+      hasMore: boolean
+      nextCursor?: string
+      list: BackendPicture[]
+    }>
+  >("/api/picture/list/cursor", payload)
+  const result = unwrapApiResponse(data)
+
+  return mapPictureCursorPageToListResult(result.data)
 }
 
 export async function listSpherePictures(limit: number): Promise<ListPicturesResult> {

@@ -15,6 +15,7 @@ export interface Photo {
   tags: string[]
   format?: string
   dominantColor?: string
+  blurHash?: string
   viewCount?: number
   likeCount?: number
   createdAt?: string

@@ -1,9 +1,9 @@
-import { act, fireEvent, render, screen } from "@testing-library/react"
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 
 import App from "./App"
 
-const { mockListPictures, mockUploadDialogController } = vi.hoisted(() => ({
-  mockListPictures: vi.fn(),
+const { mockListPicturesCursor, mockUploadDialogController } = vi.hoisted(() => ({
+  mockListPicturesCursor: vi.fn(),
   mockUploadDialogController: {
     props: null as null | {
       onUploadTaskEvent?: (event: unknown) => void
@@ -111,7 +111,7 @@ vi.mock("@/components/PhotoPreviewOverlay", () => ({
 }))
 
 vi.mock("@/lib/picture-api", () => ({
-  listPictures: mockListPictures,
+  listPicturesCursor: mockListPicturesCursor,
   getPictureDetail: vi.fn(),
   deletePicture: vi.fn(),
 }))
@@ -135,10 +135,10 @@ describe("App route transitions", () => {
 
   beforeEach(() => {
     requestAnimationFrameQueue.length = 0
-    mockListPictures.mockResolvedValue({
-      pageNum: 1,
-      pageSize: 10,
-      total: 0,
+    mockListPicturesCursor.mockResolvedValue({
+      pageSize: 30,
+      hasMore: false,
+      nextCursor: "",
       list: [],
     })
     mockUploadDialogController.props = null
@@ -167,6 +167,25 @@ describe("App route transitions", () => {
 
     expect(screen.getByTestId("mock-header")).toHaveAttribute("data-current-page", "gallery")
     expect(screen.getByTestId("mock-header")).toHaveAttribute("data-suspend-layout-projection", "false")
+  })
+
+  it("loads the gallery through the cursor picture endpoint", async () => {
+    window.history.replaceState({}, "", "/gallery")
+
+    render(<App />)
+
+    await waitFor(() => {
+      expect(mockListPicturesCursor).toHaveBeenCalledWith({ pageSize: 30 })
+    })
+  })
+
+  it("shows a readable retry action when gallery loading fails", async () => {
+    mockListPicturesCursor.mockRejectedValue(new Error("Network failed"))
+    window.history.replaceState({}, "", "/gallery")
+
+    render(<App />)
+
+    expect(await screen.findByRole("button", { name: "重试" })).toBeInTheDocument()
   })
 
   it("moves upload tasks through explicit transfer, processing, and review phases", () => {

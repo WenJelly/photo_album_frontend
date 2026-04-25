@@ -15,7 +15,7 @@ vi.mock("./request", async () => {
   }
 })
 
-import { getPictureDetail, listPictures, listSpherePictures, uploadPictureFile } from "./picture-api"
+import { getPictureDetail, listPictures, listPicturesCursor, listSpherePictures, uploadPictureFile } from "./picture-api"
 
 function createPicturePage(pageSize: number) {
   return {
@@ -30,6 +30,7 @@ function createPicturePage(pageSize: number) {
           url: "https://example.com/photo.jpg",
           thumbnailUrl: "https://example.com/photo-thumb.jpg",
           name: "Photo",
+          blurHash: "00TI:j",
         },
       ],
     },
@@ -72,6 +73,54 @@ describe("picture-api list helpers", () => {
     })
     expect(result.list).toHaveLength(1)
     expect(result.list[0]?.thumbnailSrc).toBe("https://example.com/photo-thumb.jpg")
+    expect(result.list[0]?.blurHash).toBe("00TI:j")
+  })
+
+  it("loads the public gallery through the cursor endpoint without total counts", async () => {
+    mockedPost.mockResolvedValue({
+      data: {
+        code: 200,
+        data: {
+          pageSize: 30,
+          hasMore: true,
+          nextCursor: "next-token",
+          list: [
+            {
+              id: "1",
+              url: "https://example.com/photo.jpg",
+              thumbnailUrl: "https://example.com/photo-thumb.jpg",
+              name: "Photo",
+              picWidth: 1200,
+              picHeight: 800,
+              blurHash: "00TI:j",
+            },
+          ],
+        },
+      },
+    })
+
+    const result = await listPicturesCursor({ cursor: "cursor-token", pageSize: 80 })
+
+    expect(mockedPost).toHaveBeenCalledWith("/api/picture/list/cursor", {
+      cursor: "cursor-token",
+      pageSize: 60,
+      compressPictureType: {
+        compressType: 1,
+      },
+    })
+    expect(result).toEqual({
+      pageSize: 30,
+      hasMore: true,
+      nextCursor: "next-token",
+      list: [
+        expect.objectContaining({
+          id: "1",
+          width: 1200,
+          height: 800,
+          blurHash: "00TI:j",
+        }),
+      ],
+    })
   })
 
   it("loads picture detail through the documented POST endpoint", async () => {

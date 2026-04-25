@@ -15,11 +15,12 @@
 5. `POST /api/admin/user/update`
 6. `POST /api/admin/picture/list`
 7. `POST /api/picture/list`
-8. `POST /api/picture/vo`
-9. `POST /api/picture/upload`
-10. `POST /api/picture/upload/url`
-11. `POST /api/picture/delete`
-12. `POST /api/picture/review`
+8. `POST /api/picture/list/cursor`
+9. `POST /api/picture/vo`
+10. `POST /api/picture/upload`
+11. `POST /api/picture/upload/url`
+12. `POST /api/picture/delete`
+13. `POST /api/picture/review`
 
 ## 2. 全局约定
 
@@ -210,6 +211,7 @@ YYYY-MM-DD HH:mm:ss
   "reviewTime": "2026-04-23 10:05:00",
   "thumbnailUrl": "https://cos.example.com/...",
   "picColor": "#A1B2C3",
+  "blurHash": "00TI:j",
   "viewCount": 12,
   "likeCount": 0
 }
@@ -241,6 +243,7 @@ YYYY-MM-DD HH:mm:ss
 | `reviewTime` | `string` | 审核时间，没有时为空字符串 |
 | `thumbnailUrl` | `string` | 缩略图/压缩图地址 |
 | `picColor` | `string` | 主色，格式示例 `#A1B2C3` |
+| `blurHash` | `string` | BlurHash 占位符；旧数据可能为空，前端应回退到 `picColor` |
 | `viewCount` | `number` | 浏览次数 |
 | `likeCount` | `number` | 点赞数，当前后端只返回，不提供变更接口 |
 
@@ -255,7 +258,36 @@ YYYY-MM-DD HH:mm:ss
 }
 ```
 
-### 3.4 LoginResponse
+### 3.4 PictureCursorPageResponse
+
+公开图库无限滚动优先使用：
+
+```http
+POST /api/picture/list/cursor
+Content-Type: application/json
+```
+
+请求字段沿用 `/api/picture/list` 的公开过滤字段，分页字段改为：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `cursor` | `string` | 可选；上一页返回的 `nextCursor`，前端不解析 |
+| `pageSize` | `number` | 默认 `30`，最大 `60` |
+
+成功返回：
+
+```json
+{
+  "pageSize": 30,
+  "hasMore": true,
+  "nextCursor": "opaque-token",
+  "list": []
+}
+```
+
+`/api/picture/list/cursor` 不返回 `total`，后端按 `id desc` 做游标翻页，避免大数据量下的 offset 扫描。
+
+### 3.5 LoginResponse
 
 ```json
 {
@@ -301,6 +333,7 @@ YYYY-MM-DD HH:mm:ss
 | `/api/admin/user/update` | `POST` | 是 | 是 | 管理员修改任意用户资料和角色 |
 | `/api/admin/picture/list` | `POST` | 是 | 是 | 管理员获取图片审核列表 |
 | `/api/picture/list` | `POST` | 否 | 否 | 获取公开图片分页列表 |
+| `/api/picture/list/cursor` | `POST` | 否 | 否 | 获取公开图片游标分页列表，用于图库无限滚动 |
 | `/api/picture/vo` | `POST` | 是 | 否 | 获取单张图片详情，用于预览 |
 | `/api/picture/upload` | `POST` | 是 | 否 | 本地文件上传图片；传 `id` 时可更新已有图片 |
 | `/api/picture/upload/url` | `POST` | 是 | 否 | 通过远程 URL 上传图片；传 `id` 时可更新已有图片 |
