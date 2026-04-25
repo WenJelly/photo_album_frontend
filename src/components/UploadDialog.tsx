@@ -4,6 +4,7 @@ import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { uploadPictureByUrl, uploadPictureFile } from "@/lib/picture-api"
 import { cn } from "@/lib/utils"
+import type { UploadTaskEvent } from "@/types/island-task"
 import type { Photo } from "@/types/photo"
 
 type UploadMode = "file" | "url"
@@ -11,6 +12,7 @@ type UploadMode = "file" | "url"
 interface UploadDialogProps {
   open: boolean
   onClose: () => void
+  onUploadTaskEvent?: (event: UploadTaskEvent) => void
   onUploaded: (photo: Photo) => void
 }
 
@@ -33,7 +35,7 @@ function trimText(value: string) {
   return value.trim()
 }
 
-export function UploadDialog({ open, onClose, onUploaded }: UploadDialogProps) {
+export function UploadDialog({ open, onClose, onUploadTaskEvent, onUploaded }: UploadDialogProps) {
   const shouldCloseFromBackdropRef = useRef(false)
   const [mode, setMode] = useState<UploadMode>("file")
   const [file, setFile] = useState<File | null>(null)
@@ -113,6 +115,11 @@ export function UploadDialog({ open, onClose, onUploaded }: UploadDialogProps) {
     }
 
     setIsSubmitting(true)
+    onUploadTaskEvent?.({
+      type: "start",
+      mode,
+      label: normalizedPicName || (mode === "file" ? file?.name ?? "Untitled upload" : trimText(fileUrl)),
+    })
 
     try {
       const uploadedPhoto =
@@ -123,6 +130,13 @@ export function UploadDialog({ open, onClose, onUploaded }: UploadDialogProps) {
               introduction: normalizedIntroduction,
               category: normalizedCategory,
               tags: normalizedTags,
+              onProgress: (progress) => {
+                onUploadTaskEvent?.({
+                  type: "progress",
+                  mode: "file",
+                  progress,
+                })
+              },
             })
           : await uploadPictureByUrl({
               fileUrl: trimText(fileUrl),
@@ -130,12 +144,30 @@ export function UploadDialog({ open, onClose, onUploaded }: UploadDialogProps) {
               introduction: normalizedIntroduction,
               category: normalizedCategory,
               tags: normalizedTags,
+              onProgress: (progress) => {
+                onUploadTaskEvent?.({
+                  type: "progress",
+                  mode: "url",
+                  progress,
+                })
+              },
             })
 
+      onUploadTaskEvent?.({
+        type: "success",
+        mode,
+        photo: uploadedPhoto,
+      })
       onUploaded(uploadedPhoto)
-      onClose()
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : DEFAULT_ERROR_MESSAGE)
+      const message = error instanceof Error ? error.message : DEFAULT_ERROR_MESSAGE
+
+      setErrorMessage(message)
+      onUploadTaskEvent?.({
+        type: "error",
+        mode,
+        message,
+      })
     } finally {
       setIsSubmitting(false)
     }

@@ -15,6 +15,7 @@ import {
 } from "@/lib/picture-compress"
 import { normalizePictureDeleteId } from "@/lib/picture-delete"
 import { trimToUndefined } from "@/lib/text"
+import { buildUploadProgressSnapshot, type UploadProgressSnapshot } from "@/lib/upload-progress"
 import type { Photo } from "@/types/photo"
 
 export interface ListPicturesParams {
@@ -49,6 +50,7 @@ export interface UploadPictureFileParams {
   introduction?: string
   category?: string
   tags?: string[]
+  onProgress?: (progress: UploadProgressSnapshot) => void
 }
 
 export interface UploadPictureByUrlParams {
@@ -58,6 +60,7 @@ export interface UploadPictureByUrlParams {
   introduction?: string
   category?: string
   tags?: string[]
+  onProgress?: (progress: UploadProgressSnapshot) => void
 }
 
 export interface DeletePictureResult {
@@ -223,6 +226,9 @@ export async function uploadPictureFile(params: UploadPictureFileParams): Promis
     headers: {
       "Content-Type": "multipart/form-data",
     },
+    onUploadProgress: (event) => {
+      params.onProgress?.(buildUploadProgressSnapshot(event))
+    },
     timeout: UPLOAD_REQUEST_TIMEOUT,
   })
   const result = unwrapApiResponse(data)
@@ -257,6 +263,9 @@ export async function uploadPictureByUrl(params: UploadPictureByUrlParams): Prom
   }
 
   const { data } = await request.post<ApiEnvelope<BackendPicture>>("/api/picture/upload/url", payload, {
+    onUploadProgress: (event) => {
+      params.onProgress?.(buildUploadProgressSnapshot(event))
+    },
     timeout: UPLOAD_REQUEST_TIMEOUT,
   })
   const result = unwrapApiResponse(data)
