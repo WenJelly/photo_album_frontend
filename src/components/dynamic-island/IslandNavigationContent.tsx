@@ -22,25 +22,46 @@ interface IslandNavigationContentProps {
 }
 
 const navItemClass =
-  "rounded-full px-3 py-2 text-[13px] font-medium tracking-[0.02em] text-white/70 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
+  "shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-[13px] font-medium tracking-[0.02em] text-white/70 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
 const navItemActiveClass = "bg-white/12 text-white"
 const actionClass =
-  "inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.03] px-3.5 py-2 text-sm font-medium text-white/82 transition hover:bg-white/[0.10] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
+  "dynamic-island-geometry-lock inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-white/12 bg-white/[0.03] px-3.5 py-2 text-sm font-medium text-white/82 transition hover:bg-white/[0.10] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35"
+
+function IslandAvatar({
+  className,
+  user,
+}: {
+  className: string
+  user: AuthUser
+}) {
+  if (user.userAvatar) {
+    return (
+      <span data-testid="dynamic-island-avatar-frame" className={cn("dynamic-island-avatar-frame", className)}>
+        <img
+          data-testid="dynamic-island-avatar-media"
+          src={user.userAvatar}
+          alt=""
+          className="dynamic-island-avatar-media dynamic-island-geometry-lock"
+        />
+      </span>
+    )
+  }
+
+  return (
+    <span data-testid="dynamic-island-avatar-frame" className={cn("dynamic-island-avatar-frame", className)}>
+      <span className="dynamic-island-avatar-fallback dynamic-island-geometry-lock">
+        <User className="size-4" />
+      </span>
+    </span>
+  )
+}
 
 function CompactAvatar({ isLoggedIn, user }: { isLoggedIn: boolean; user: AuthUser | null }) {
   if (!isLoggedIn) {
     return <span className="dynamic-island-login-chip">Login</span>
   }
 
-  if (user?.userAvatar) {
-    return <img src={user.userAvatar} alt="" className="size-9 rounded-full object-cover" />
-  }
-
-  return (
-    <span className="dynamic-island-avatar-fallback">
-      <User className="size-4" />
-    </span>
-  )
+  return <IslandAvatar className="size-9" user={user!} />
 }
 
 export function IslandNavigationContent({
@@ -68,16 +89,13 @@ export function IslandNavigationContent({
       <button
         type="button"
         data-testid="dynamic-island-toggle"
-        className="dynamic-island-compact-toggle"
+        className="dynamic-island-compact-toggle dynamic-island-content-offset"
         data-reduced-motion={String(reducedMotion)}
         onClick={onCompactToggle}
       >
-        <span className="flex items-center gap-3">
-          <img src="/boluo.svg" alt="" aria-hidden="true" className="h-9 w-auto object-contain" />
-          <span className="dynamic-island-brand">
-            <span className="dynamic-island-brand__title">WenJelly</span>
-            <span className="dynamic-island-brand__caption">Standby Capsule</span>
-          </span>
+        <span className="dynamic-island-brand">
+          <span className="dynamic-island-brand__title dynamic-island-text-container">WenJelly</span>
+          <span className="dynamic-island-brand__caption dynamic-island-text-container">Standby Capsule</span>
         </span>
         <CompactAvatar isLoggedIn={isLoggedIn} user={user} />
       </button>
@@ -85,16 +103,8 @@ export function IslandNavigationContent({
   }
 
   return (
-    <div className="dynamic-island-nav">
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={onHomeClick}
-          className="dynamic-island-logo-button"
-          aria-label="Navigate home"
-        >
-          <img src="/boluo.svg" alt="" aria-hidden="true" className="h-9 w-auto object-contain md:h-10" />
-        </button>
+    <div className="dynamic-island-nav dynamic-island-content-offset">
+      <div className="min-w-0">
         <nav className="dynamic-island-nav__links" aria-label="Primary">
           <button
             type="button"
@@ -141,12 +151,8 @@ export function IslandNavigationContent({
         {isLoggedIn ? (
           <>
             <button type="button" onClick={onMyProfileClick} className={actionClass}>
-              {user?.userAvatar ? (
-                <img src={user.userAvatar} alt="" className="size-6 rounded-full object-cover" />
-              ) : (
-                <User className="size-4" />
-              )}
-              <span className="max-w-[8ch] truncate">{user?.userName}</span>
+              <IslandAvatar className="size-6" user={user!} />
+              <span className="dynamic-island-text-container max-w-[8ch]">{user?.userName}</span>
             </button>
             <button type="button" onClick={onLogoutClick} className="dynamic-island-icon-button" aria-label="退出登录">
               <LogOut className="size-4" />

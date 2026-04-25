@@ -12,7 +12,6 @@ const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)"
 const COMPACT_ENTER_SCROLL_PX = 96
 const EXPANDED_TOP_SCROLL_PX = 40
 const UPWARD_RELEASE_PX = 28
-const DIRECTION_EPSILON_PX = 2
 
 function readMediaQueryMatch(query: string) {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
@@ -25,8 +24,8 @@ function readMediaQueryMatch(query: string) {
 export function useIslandController({ hasTask, routeKey }: UseIslandControllerOptions) {
   const rootRef = useRef<HTMLElement | null>(null)
   const lastScrollYRef = useRef(0)
-  const lastScrollDirectionRef = useRef<"up" | "down" | null>(null)
   const upwardReleaseStartRef = useRef<number | null>(null)
+  const compactEnterAnchorRef = useRef(0)
   const compactPreferenceRef = useRef(false)
   const scrollFrameRef = useRef<number | null>(null)
   const [canHover, setCanHover] = useState(() => readMediaQueryMatch(HOVER_MEDIA_QUERY))
@@ -75,21 +74,21 @@ export function useIslandController({ hasTask, routeKey }: UseIslandControllerOp
   }, [])
 
   const syncCompactPreference = useCallback((nextScrollY: number, options?: { reset?: boolean }) => {
+    const previousCompactPreference = compactPreferenceRef.current
     const previousScrollY = options?.reset ? nextScrollY : lastScrollYRef.current
     const delta = nextScrollY - previousScrollY
 
     if (options?.reset) {
-      lastScrollDirectionRef.current = null
       upwardReleaseStartRef.current = null
-    } else if (delta >= DIRECTION_EPSILON_PX) {
-      lastScrollDirectionRef.current = "down"
-      upwardReleaseStartRef.current = null
-    } else if (delta <= -DIRECTION_EPSILON_PX) {
-      lastScrollDirectionRef.current = "up"
-
-      if (upwardReleaseStartRef.current === null) {
+      compactEnterAnchorRef.current = nextScrollY
+    } else if (compactPreferenceRef.current) {
+      if (delta > 0) {
+        upwardReleaseStartRef.current = null
+      } else if (delta < 0 && upwardReleaseStartRef.current === null) {
         upwardReleaseStartRef.current = previousScrollY
       }
+    } else if (delta < 0 || nextScrollY < compactEnterAnchorRef.current) {
+      compactEnterAnchorRef.current = nextScrollY
     }
 
     let nextCompactPreference = compactPreferenceRef.current
@@ -97,8 +96,11 @@ export function useIslandController({ hasTask, routeKey }: UseIslandControllerOp
     if (nextScrollY <= EXPANDED_TOP_SCROLL_PX) {
       nextCompactPreference = false
       upwardReleaseStartRef.current = null
+      compactEnterAnchorRef.current = nextScrollY
     } else if (!nextCompactPreference) {
-      if (nextScrollY >= COMPACT_ENTER_SCROLL_PX && lastScrollDirectionRef.current === "down") {
+      const downwardTravel = nextScrollY - compactEnterAnchorRef.current
+
+      if (downwardTravel >= COMPACT_ENTER_SCROLL_PX) {
         nextCompactPreference = true
       }
     } else {
@@ -108,11 +110,16 @@ export function useIslandController({ hasTask, routeKey }: UseIslandControllerOp
       if (upwardReleaseDistance >= UPWARD_RELEASE_PX) {
         nextCompactPreference = false
         upwardReleaseStartRef.current = null
+        compactEnterAnchorRef.current = nextScrollY
       }
     }
 
     compactPreferenceRef.current = nextCompactPreference
     setPrefersCompact(nextCompactPreference)
+
+    if (nextCompactPreference && !previousCompactPreference) {
+      setIsHoverExpanded(false)
+    }
 
     if (!nextCompactPreference) {
       setIsManualExpanded(false)
@@ -128,8 +135,8 @@ export function useIslandController({ hasTask, routeKey }: UseIslandControllerOp
     setIsFocusExpanded(false)
     setIsManualExpanded(false)
     compactPreferenceRef.current = false
+    compactEnterAnchorRef.current = nextScrollY
     lastScrollYRef.current = nextScrollY
-    lastScrollDirectionRef.current = null
     upwardReleaseStartRef.current = null
     syncCompactPreference(nextScrollY, { reset: true })
   }, [routeKey, syncCompactPreference])
@@ -149,8 +156,6 @@ export function useIslandController({ hasTask, routeKey }: UseIslandControllerOp
         syncCompactPreference(window.scrollY)
       })
     }
-
-    scheduleSync()
 
     window.addEventListener("scroll", scheduleSync, { passive: true })
     return () => {
@@ -189,7 +194,7 @@ export function useIslandController({ hasTask, routeKey }: UseIslandControllerOp
       setIsFocusExpanded(true)
     },
     onMouseEnter() {
-      if (canHover) {
+      if (canHover && compactPreferenceRef.current) {
         setIsHoverExpanded(true)
       }
     },

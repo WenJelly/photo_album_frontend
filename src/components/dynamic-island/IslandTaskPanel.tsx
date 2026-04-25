@@ -55,17 +55,17 @@ export function IslandTaskPanel({ onDismiss, onToggleTerminal, reducedMotion, ta
   return (
     <div className="dynamic-island-task-panel">
       <div className="dynamic-island-task-panel__summary">
-        <div className="space-y-1">
+        <div className="dynamic-island-task-panel__text space-y-1">
           <p className="dynamic-island-eyebrow">{getTaskEyebrow(task)}</p>
           <div className="dynamic-island-task-panel__title-row">
-            <h2 className="dynamic-island-task-panel__title">{task.title}</h2>
-            <span className={getStatusTone(task)}>{getStatusLabel(task)}</span>
+            <h2 className="dynamic-island-task-panel__title dynamic-island-text-container">{task.title}</h2>
+            <span className={`${getStatusTone(task)} dynamic-island-geometry-lock`}>{getStatusLabel(task)}</span>
           </div>
-          <p className="dynamic-island-task-panel__copy">{task.summary}</p>
+          <p className="dynamic-island-task-panel__copy dynamic-island-text-container">{task.summary}</p>
         </div>
         <div className="dynamic-island-task-panel__controls">
           {task.metric ? (
-            <div className="dynamic-island-metric">
+            <div className="dynamic-island-metric dynamic-island-geometry-lock">
               <span className="dynamic-island-metric__label">{task.metric.label}</span>
               <span className="dynamic-island-metric__value">{task.metric.value}</span>
             </div>
@@ -73,7 +73,7 @@ export function IslandTaskPanel({ onDismiss, onToggleTerminal, reducedMotion, ta
           <button
             type="button"
             data-testid="island-task-terminal-toggle"
-            className="dynamic-island-ghost-button"
+            className="dynamic-island-ghost-button dynamic-island-geometry-lock"
             onClick={onToggleTerminal}
           >
             {task.terminalOpen ? "Hide Terminal" : "Mini Terminal"}
@@ -82,7 +82,7 @@ export function IslandTaskPanel({ onDismiss, onToggleTerminal, reducedMotion, ta
             <button
               type="button"
               data-testid="island-task-dismiss"
-              className="dynamic-island-icon-button"
+              className="dynamic-island-icon-button dynamic-island-geometry-lock"
               onClick={onDismiss}
               aria-label="Dismiss task panel"
             >

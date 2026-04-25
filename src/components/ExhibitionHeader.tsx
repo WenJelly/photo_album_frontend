@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { cn } from "@/lib/utils"
 import type { IslandTask } from "@/types/island-task"
 
+import { BoluoLogo } from "./dynamic-island/BoluoLogo"
 import { IslandNavigationContent } from "./dynamic-island/IslandNavigationContent"
 import { IslandTaskPanel } from "./dynamic-island/IslandTaskPanel"
 import { useIslandController } from "./dynamic-island/useIslandController"
@@ -24,12 +25,11 @@ interface ExhibitionHeaderProps {
   onToggleTaskTerminal: () => void
   onUploadClick: () => void
   routeKey: string
-  suspendLayoutProjection?: boolean
   task: IslandTask | null
   variant: ExhibitionHeaderVariant
 }
 
-const shellSpringTransition = { type: "spring", stiffness: 260, damping: 32, mass: 0.9 } as const
+const shellSpringTransition = { type: "spring", stiffness: 260, damping: 32, mass: 0.9, bounce: 0 } as const
 const reducedMotionTransition = { duration: 0.16 } as const
 const contentTransition = { duration: 0.22, ease: [0.22, 1, 0.36, 1] } as const
 
@@ -45,6 +45,12 @@ function getIslandWidthClass(view: "expanded" | "compact" | "task") {
   return "w-[min(60rem,calc(100vw-1.5rem))]"
 }
 
+function getContentFrameClass(view: "expanded" | "compact" | "task") {
+  return view === "compact"
+    ? "dynamic-island-content-frame dynamic-island-content-frame--shell"
+    : "dynamic-island-content-frame dynamic-island-content-frame--intrinsic"
+}
+
 export function ExhibitionHeader({
   canRunStressDemo,
   currentPage,
@@ -58,7 +64,6 @@ export function ExhibitionHeader({
   onToggleTaskTerminal,
   onUploadClick,
   routeKey,
-  suspendLayoutProjection = false,
   task,
   variant,
 }: ExhibitionHeaderProps) {
@@ -94,9 +99,9 @@ export function ExhibitionHeader({
         exit: { opacity: 0 },
       }
     : {
-        initial: { opacity: 0, y: 6 },
-        animate: { opacity: 1, y: 0 },
-        exit: { opacity: 0, y: -6 },
+        initial: { opacity: 0, y: 6, scale: 0.96 },
+        animate: { opacity: 1, y: 0, scale: 1 },
+        exit: { opacity: 0, y: -6, scale: 0.96 },
       }
 
   return (
@@ -118,10 +123,10 @@ export function ExhibitionHeader({
         className="pointer-events-auto"
       >
         <motion.div
-          layout={layoutEnabled && !suspendLayoutProjection}
+          layout={layoutEnabled}
           data-testid="dynamic-island-shell"
           data-testid-legacy="exhibition-header"
-          data-layout-enabled={String(layoutEnabled && !suspendLayoutProjection)}
+          data-layout-enabled={String(layoutEnabled)}
           data-shell-layout="true"
           className={cn(
             getIslandWidthClass(view),
@@ -131,46 +136,68 @@ export function ExhibitionHeader({
           )}
           transition={shellTransition}
         >
-          <AnimatePresence mode="popLayout" initial={false}>
-            {view === "task" && task ? (
-              <motion.div
-                key="task"
-                {...contentAnimation}
-                transition={innerContentTransition}
-              >
-                <IslandTaskPanel
-                  onDismiss={onDismissTask}
-                  task={task}
-                  onToggleTerminal={onToggleTaskTerminal}
-                  reducedMotion={prefersReducedMotion}
-                />
-              </motion.div>
-            ) : (
-              <motion.div
-                key={view}
-                {...contentAnimation}
-                transition={innerContentTransition}
-              >
-                <IslandNavigationContent
-                  canRunStressDemo={canRunStressDemo}
-                  compact={view === "compact"}
-                  currentPage={currentPage}
-                  isLoggedIn={isLoggedIn}
-                  onAdminReviewClick={onAdminReviewClick}
-                  onCompactToggle={onCompactToggle}
-                  onGalleryClick={onGalleryClick}
-                  onHomeClick={onHomeClick}
-                  onLoginClick={onLoginClick}
-                  onLogoutClick={logout}
-                  onMyProfileClick={onMyProfileClick}
-                  onRunStressDemo={onRunStressDemo}
-                  onUploadClick={onUploadClick}
-                  reducedMotion={prefersReducedMotion}
-                  user={user}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {view !== "task" ? (
+            <div className="dynamic-island-logo-anchor" data-testid="dynamic-island-logo-anchor">
+              <div className="dynamic-island-logo-anchor__inner" data-testid="dynamic-island-logo-anchor-inner">
+                <button
+                  type="button"
+                  className="dynamic-island-logo-anchor__button"
+                  onClick={view === "compact" ? onCompactToggle : onHomeClick}
+                  aria-label={view === "compact" ? "Expand navigation" : "Navigate home"}
+                >
+                  <BoluoLogo className="h-9 w-auto object-contain" />
+                </button>
+              </div>
+            </div>
+          ) : null}
+          <div className="dynamic-island-content-stage" data-testid="dynamic-island-content-stage">
+            <AnimatePresence mode="popLayout" initial={false}>
+              {view === "task" && task ? (
+                <motion.div
+                  key="task"
+                  {...contentAnimation}
+                  className={getContentFrameClass(view)}
+                  data-island-content-view="task"
+                  data-testid="dynamic-island-content-frame"
+                  transition={innerContentTransition}
+                >
+                  <IslandTaskPanel
+                    onDismiss={onDismissTask}
+                    task={task}
+                    onToggleTerminal={onToggleTaskTerminal}
+                    reducedMotion={prefersReducedMotion}
+                  />
+                </motion.div>
+              ) : (
+                <motion.div
+                  key={view}
+                  {...contentAnimation}
+                  className={getContentFrameClass(view)}
+                  data-island-content-view={view}
+                  data-testid="dynamic-island-content-frame"
+                  transition={innerContentTransition}
+                >
+                  <IslandNavigationContent
+                    canRunStressDemo={canRunStressDemo}
+                    compact={view === "compact"}
+                    currentPage={currentPage}
+                    isLoggedIn={isLoggedIn}
+                    onAdminReviewClick={onAdminReviewClick}
+                    onCompactToggle={onCompactToggle}
+                    onGalleryClick={onGalleryClick}
+                    onHomeClick={onHomeClick}
+                    onLoginClick={onLoginClick}
+                    onLogoutClick={logout}
+                    onMyProfileClick={onMyProfileClick}
+                    onRunStressDemo={onRunStressDemo}
+                    onUploadClick={onUploadClick}
+                    reducedMotion={prefersReducedMotion}
+                    user={user}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </motion.div>
       </motion.header>
     </div>

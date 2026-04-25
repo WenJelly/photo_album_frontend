@@ -187,6 +187,9 @@
 }
 
 .dynamic-island-shell {
+  --dynamic-island-logo-anchor-left: 0.75rem;
+  --dynamic-island-logo-anchor-width: 2.25rem;
+  --dynamic-island-logo-content-offset: 3.25rem;
   position: relative;
   overflow: hidden;
   border-radius: 2rem;
@@ -199,6 +202,40 @@
     inset 0 -1px 0 rgba(148, 163, 184, 0.1),
     0 24px 60px rgba(2, 6, 23, 0.28);
   backdrop-filter: blur(26px) saturate(160%);
+}
+
+.dynamic-island-content-frame {
+  position: relative;
+  z-index: 1;
+  grid-area: 1 / 1;
+  min-width: 100%;
+}
+
+.dynamic-island-content-frame--intrinsic {
+  max-width: 100%;
+  width: max-content;
+}
+
+.dynamic-island-content-frame--shell {
+  width: 100%;
+}
+
+.dynamic-island-content-stage {
+  display: grid;
+  isolation: isolate;
+  position: relative;
+}
+
+.dynamic-island-text-container {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dynamic-island-geometry-lock {
+  flex-shrink: 0;
+  transform-origin: center;
 }
 
 .dynamic-island-shell::before {
@@ -243,11 +280,41 @@
     rgba(8, 15, 30, 0.84);
 }
 
+.dynamic-island-logo-anchor {
+  position: absolute;
+  top: 50%;
+  left: var(--dynamic-island-logo-anchor-left);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.dynamic-island-logo-anchor__inner {
+  transform: translate3d(0, -50%, 0);
+}
+
+.dynamic-island-logo-anchor__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--dynamic-island-logo-anchor-width);
+  height: var(--dynamic-island-logo-anchor-width);
+  border-radius: 999px;
+  color: white;
+  pointer-events: auto;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  transition: background-color 180ms ease;
+}
+
+.dynamic-island-logo-anchor__button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .dynamic-island-nav {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 1rem;
   padding: 0.85rem 1rem;
@@ -256,6 +323,7 @@
 .dynamic-island-nav__links {
   display: flex;
   flex-wrap: wrap;
+  min-width: 0;
   align-items: center;
   gap: 0.4rem;
 }
@@ -263,25 +331,15 @@
 .dynamic-island-nav__actions {
   display: flex;
   flex-wrap: wrap;
+  min-width: 0;
   align-items: center;
   justify-content: flex-end;
   gap: 0.55rem;
 }
 
-.dynamic-island-logo-button {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  padding: 0.25rem;
-  transition: background-color 180ms ease;
-}
-
-.dynamic-island-logo-button:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-
 .dynamic-island-icon-button {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
   width: 2.5rem;
@@ -301,6 +359,7 @@
 
 .dynamic-island-ghost-button {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
@@ -310,6 +369,7 @@
   min-height: 2.35rem;
   padding: 0.45rem 0.95rem;
   font-size: 0.78rem;
+  white-space: nowrap;
   transition: background-color 180ms ease, color 180ms ease;
 }
 
@@ -327,11 +387,13 @@
 
 .dynamic-island-brand {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   align-items: flex-start;
 }
 
 .dynamic-island-brand__title {
+  display: block;
   font-size: 0.96rem;
   font-weight: 600;
   letter-spacing: -0.03em;
@@ -339,6 +401,7 @@
 
 .dynamic-island-brand__caption,
 .dynamic-island-eyebrow {
+  display: block;
   color: rgba(226, 232, 240, 0.65);
   font-size: 0.68rem;
   letter-spacing: 0.16em;
@@ -348,6 +411,7 @@
 .dynamic-island-login-chip,
 .dynamic-island-avatar-fallback {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
   min-width: 2.5rem;
@@ -359,6 +423,33 @@
   color: rgba(255, 255, 255, 0.86);
   font-size: 0.78rem;
   font-weight: 500;
+  white-space: nowrap;
+}
+
+.dynamic-island-avatar-frame {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 999px;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+.dynamic-island-avatar-media {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+
+.dynamic-island-avatar-frame > .dynamic-island-avatar-fallback {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding-inline: 0;
 }
 
 .dynamic-island-task-panel {
@@ -378,20 +469,27 @@
   align-items: start;
 }
 
+.dynamic-island-task-panel__text {
+  min-width: 0;
+}
+
 .dynamic-island-task-panel__title-row {
   display: flex;
-  flex-wrap: wrap;
+  min-width: 0;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 0.75rem;
 }
 
 .dynamic-island-task-panel__title {
+  min-width: 0;
   font-size: clamp(1rem, 1.2vw, 1.15rem);
   font-weight: 600;
   letter-spacing: -0.04em;
 }
 
 .dynamic-island-task-panel__copy {
+  max-width: 100%;
   color: rgba(226, 232, 240, 0.75);
   font-size: 0.88rem;
   line-height: 1.5;
@@ -407,6 +505,7 @@
 .dynamic-island-status,
 .dynamic-island-metric {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 0.4rem;
   min-height: 2.2rem;
@@ -689,4 +788,8 @@
     font-size: 0.65rem;
     padding: 0.46rem 0.72rem;
   }
+}
+
+.dynamic-island-content-offset {
+  padding-left: var(--dynamic-island-logo-content-offset);
 }

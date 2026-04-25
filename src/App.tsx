@@ -1,5 +1,4 @@
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { flushSync } from "react-dom"
 
 import { AdminReviewPage } from "@/components/AdminReviewPage"
 import { AuthDialog } from "@/components/AuthDialog"
@@ -120,8 +119,6 @@ function AppShell() {
   const photoDetailCacheRef = useRef(new Map<string, Photo>())
   const homeHeroRef = useRef<HTMLElement | null>(null)
   const stressDemoTimeoutsRef = useRef<number[]>([])
-  const headerProjectionResumeFrameRef = useRef<number | null>(null)
-  const headerProjectionResumeFrameNestedRef = useRef<number | null>(null)
   const { user, isLoggedIn } = useAuth()
 
   const [route, setRoute] = useState<Route>(initialRoute)
@@ -135,7 +132,6 @@ function AppShell() {
   const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false)
   const [islandTask, setIslandTask] = useState<IslandTask | null>(null)
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false)
-  const [suspendHeaderLayoutProjection, setSuspendHeaderLayoutProjection] = useState(false)
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null)
   const [selectedPhotoDetail, setSelectedPhotoDetail] = useState<Photo | null>(null)
   const [selectedPhotoError, setSelectedPhotoError] = useState<string | null>(null)
@@ -171,34 +167,6 @@ function AppShell() {
     stressDemoTimeoutsRef.current = []
   }, [])
 
-  const clearHeaderProjectionResumeFrames = useCallback(() => {
-    if (headerProjectionResumeFrameRef.current !== null) {
-      window.cancelAnimationFrame(headerProjectionResumeFrameRef.current)
-      headerProjectionResumeFrameRef.current = null
-    }
-
-    if (headerProjectionResumeFrameNestedRef.current !== null) {
-      window.cancelAnimationFrame(headerProjectionResumeFrameNestedRef.current)
-      headerProjectionResumeFrameNestedRef.current = null
-    }
-  }, [])
-
-  const suspendHeaderProjectionForRouteChange = useCallback(() => {
-    clearHeaderProjectionResumeFrames()
-
-    flushSync(() => {
-      setSuspendHeaderLayoutProjection(true)
-    })
-
-    headerProjectionResumeFrameRef.current = window.requestAnimationFrame(() => {
-      headerProjectionResumeFrameRef.current = null
-      headerProjectionResumeFrameNestedRef.current = window.requestAnimationFrame(() => {
-        headerProjectionResumeFrameNestedRef.current = null
-        setSuspendHeaderLayoutProjection(false)
-      })
-    })
-  }, [clearHeaderProjectionResumeFrames])
-
   const scheduleTaskDismiss = useCallback(() => {
     clearTaskHideTimeout()
     islandTaskHideTimeoutRef.current = window.setTimeout(() => {
@@ -211,9 +179,8 @@ function AppShell() {
     return () => {
       clearStressDemoTimeouts()
       clearTaskHideTimeout()
-      clearHeaderProjectionResumeFrames()
     }
-  }, [clearHeaderProjectionResumeFrames, clearStressDemoTimeouts, clearTaskHideTimeout])
+  }, [clearStressDemoTimeouts, clearTaskHideTimeout])
 
   const clearSelectedPhoto = useCallback(() => {
     setSelectedPhotoId(null)
@@ -251,7 +218,6 @@ function AppShell() {
       setIsHomeHeroVisible(nextRoute.page === "home")
 
       if (isRouteChange) {
-        suspendHeaderProjectionForRouteChange()
         window.scrollTo({ top: 0, behavior: "auto" })
       }
 
@@ -259,7 +225,7 @@ function AppShell() {
         requestGalleryLoad()
       }
     },
-    [clearSelectedPhoto, galleryPhotos.length, requestGalleryLoad, route, suspendHeaderProjectionForRouteChange],
+    [clearSelectedPhoto, galleryPhotos.length, requestGalleryLoad, route],
   )
 
   const navigateToRoute = useCallback(
@@ -717,7 +683,6 @@ function AppShell() {
         canRunStressDemo={canRunStressDemo}
         currentPage={currentPage}
         routeKey={getPathFromRoute(route)}
-        suspendLayoutProjection={suspendHeaderLayoutProjection}
         onDismissTask={handleDismissTask}
         onHomeClick={() => navigateToRoute({ page: "home" })}
         onGalleryClick={() => navigateToRoute({ page: "gallery" })}
