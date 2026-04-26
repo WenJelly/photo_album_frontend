@@ -4,7 +4,6 @@ export type IslandView = "expanded" | "compact" | "task"
 
 interface UseIslandControllerOptions {
   hasTask: boolean
-  routeKey: string
 }
 
 const HOVER_MEDIA_QUERY = "(hover: hover) and (pointer: fine)"
@@ -21,7 +20,7 @@ function readMediaQueryMatch(query: string) {
   return window.matchMedia(query).matches
 }
 
-export function useIslandController({ hasTask, routeKey }: UseIslandControllerOptions) {
+export function useIslandController({ hasTask }: UseIslandControllerOptions) {
   const rootRef = useRef<HTMLElement | null>(null)
   const lastScrollYRef = useRef(0)
   const upwardReleaseStartRef = useRef<number | null>(null)
@@ -131,25 +130,12 @@ export function useIslandController({ hasTask, routeKey }: UseIslandControllerOp
   useLayoutEffect(() => {
     const nextScrollY = typeof window !== "undefined" ? window.scrollY : 0
 
-    setIsHoverExpanded(false)
-    setIsFocusExpanded(false)
-    setIsManualExpanded(false)
     compactPreferenceRef.current = false
     compactEnterAnchorRef.current = nextScrollY
     lastScrollYRef.current = nextScrollY
     upwardReleaseStartRef.current = null
     syncCompactPreference(nextScrollY, { reset: true })
-  }, [routeKey, syncCompactPreference])
-
-  useLayoutEffect(() => {
-    if (!hasTask) {
-      return
-    }
-
-    setIsHoverExpanded(false)
-    setIsFocusExpanded(false)
-    setIsManualExpanded(false)
-  }, [hasTask])
+  }, [syncCompactPreference])
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -176,7 +162,7 @@ export function useIslandController({ hasTask, routeKey }: UseIslandControllerOp
         scrollFrameRef.current = null
       }
     }
-  }, [routeKey, syncCompactPreference])
+  }, [syncCompactPreference])
 
   const isInteractionExpanded = canHover
     ? isHoverExpanded || isFocusExpanded

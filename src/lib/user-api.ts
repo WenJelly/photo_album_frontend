@@ -45,6 +45,7 @@ export interface UpdateMyProfileParams {
 
 const FALLBACK_USER_NAME = "Unnamed User"
 const FALLBACK_USER_ROLE = "user"
+const AVATAR_UPLOAD_REQUEST_TIMEOUT = 60_000
 
 function normalizeCount(value?: number | null) {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined
@@ -115,6 +116,21 @@ export async function updateMyProfile(params: UpdateMyProfileParams): Promise<My
   }
 
   const { data } = await request.post<ApiEnvelope<BackendUserProfile>>("/api/user/update", payload)
+  const result = unwrapApiResponse(data)
+
+  return mapUserProfile(result.data)
+}
+
+export async function uploadMyAvatarFile(file: File): Promise<MyUserProfile> {
+  const formData = new FormData()
+  formData.append("file", file)
+
+  const { data } = await request.post<ApiEnvelope<BackendUserProfile>>("/api/user/avatar/upload", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+    timeout: AVATAR_UPLOAD_REQUEST_TIMEOUT,
+  })
   const result = unwrapApiResponse(data)
 
   return mapUserProfile(result.data)

@@ -280,7 +280,7 @@ function drawLoadedTile(
   drawCoverImage(context, image, x, y, tileSize)
 }
 
-export function buildAtlasFallbackAssignments(tileCount: number, successfulIndices: number[]) {
+function buildAtlasFallbackAssignments(tileCount: number, successfulIndices: number[]) {
   if (!successfulIndices.length) {
     return Array.from({ length: tileCount }, () => null)
   }

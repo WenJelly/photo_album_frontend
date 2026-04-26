@@ -117,7 +117,6 @@ export function IslandTaskPanel({ onDismiss, onPreviewPhoto, onToggleTerminal, r
           {shouldShowPreviewAction(task) ? (
             <button
               type="button"
-              data-testid="island-task-preview"
               className="dynamic-island-ghost-button dynamic-island-geometry-lock"
               onClick={onPreviewPhoto}
             >
@@ -126,7 +125,6 @@ export function IslandTaskPanel({ onDismiss, onPreviewPhoto, onToggleTerminal, r
           ) : null}
           <button
             type="button"
-            data-testid="island-task-terminal-toggle"
             className="dynamic-island-ghost-button dynamic-island-geometry-lock"
             onClick={onToggleTerminal}
           >
@@ -135,7 +133,6 @@ export function IslandTaskPanel({ onDismiss, onPreviewPhoto, onToggleTerminal, r
           {task.status !== "running" ? (
             <button
               type="button"
-              data-testid="island-task-dismiss"
               className="dynamic-island-icon-button dynamic-island-geometry-lock"
               onClick={(event) => {
                 event.currentTarget.blur()
@@ -157,12 +154,10 @@ export function IslandTaskPanel({ onDismiss, onPreviewPhoto, onToggleTerminal, r
         <div className="dynamic-island-progress__track">
           {isFailedUpload ? (
             <div
-              data-testid="island-task-progress-stopped"
               className="dynamic-island-progress__bar dynamic-island-progress__bar--stopped"
             />
           ) : progressValue === null ? (
             <div
-              data-testid="island-task-progress-indeterminate"
               className="dynamic-island-progress__bar dynamic-island-progress__bar--indeterminate"
             />
           ) : (

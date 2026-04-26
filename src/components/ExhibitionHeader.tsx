@@ -78,7 +78,7 @@ export function ExhibitionHeader({
     prefersReducedMotion,
     rootRef,
     view,
-  } = useIslandController({ hasTask: task !== null, routeKey })
+  } = useIslandController({ hasTask: task !== null })
 
   const shellTransition = prefersReducedMotion ? reducedMotionTransition : shellSpringTransition
   const innerContentTransition = prefersReducedMotion ? reducedMotionTransition : contentTransition
@@ -99,13 +99,6 @@ export function ExhibitionHeader({
       <motion.header
         layoutRoot
         ref={rootRef}
-        data-testid="dynamic-island"
-        data-layout-root="true"
-        data-reduced-motion={String(prefersReducedMotion)}
-        data-shell-layout="false"
-        data-testid-legacy="exhibition-header"
-        data-variant={variant}
-        data-view={view}
         onBlurCapture={onBlurCapture}
         onFocusCapture={onFocusCapture}
         onMouseEnter={onMouseEnter}
@@ -115,9 +108,6 @@ export function ExhibitionHeader({
         <motion.div
           key={routeKey}
           layout
-          data-testid="dynamic-island-shell"
-          data-testid-legacy="exhibition-header"
-          data-shell-layout="true"
           className={cn(
             getIslandWidthClass(view),
             "dynamic-island-shell",
@@ -127,8 +117,8 @@ export function ExhibitionHeader({
           transition={shellTransition}
         >
           {view !== "task" ? (
-            <div className="dynamic-island-logo-anchor" data-testid="dynamic-island-logo-anchor">
-              <div className="dynamic-island-logo-anchor__inner" data-testid="dynamic-island-logo-anchor-inner">
+            <div className="dynamic-island-logo-anchor">
+              <div className="dynamic-island-logo-anchor__inner">
                 <button
                   type="button"
                   className="dynamic-island-logo-anchor__button"
@@ -140,15 +130,13 @@ export function ExhibitionHeader({
               </div>
             </div>
           ) : null}
-          <div className="dynamic-island-content-stage" data-testid="dynamic-island-content-stage">
+          <div className="dynamic-island-content-stage">
             <AnimatePresence mode="popLayout" initial={false}>
               {view === "task" && task ? (
                 <motion.div
                   key="task"
                   {...contentAnimation}
                   className={getContentFrameClass(view)}
-                  data-island-content-view="task"
-                  data-testid="dynamic-island-content-frame"
                   transition={innerContentTransition}
                 >
                   <IslandTaskPanel
@@ -164,8 +152,6 @@ export function ExhibitionHeader({
                   key={view}
                   {...contentAnimation}
                   className={getContentFrameClass(view)}
-                  data-island-content-view={view}
-                  data-testid="dynamic-island-content-frame"
                   transition={innerContentTransition}
                 >
                   <IslandNavigationContent
@@ -182,7 +168,6 @@ export function ExhibitionHeader({
                     onMyProfileClick={onMyProfileClick}
                     onRunStressDemo={onRunStressDemo}
                     onUploadClick={onUploadClick}
-                    reducedMotion={prefersReducedMotion}
                     user={user}
                   />
                 </motion.div>

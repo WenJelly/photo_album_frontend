@@ -59,7 +59,6 @@ function BlurHashCanvas({ blurHash }: { blurHash: string }) {
       width={BLURHASH_CANVAS_SIZE}
       height={BLURHASH_CANVAS_SIZE}
       aria-hidden="true"
-      data-testid="progressive-image-blurhash"
       className="absolute inset-0 h-full w-full scale-105 object-cover blur-2xl"
     />
   )
@@ -113,7 +112,6 @@ export function ProgressiveImage({
   return (
     <div
       ref={frameRef}
-      data-testid="progressive-image-frame"
       className={cn("relative h-full w-full overflow-hidden", className)}
       style={{
         aspectRatio: `${width} / ${height}`,

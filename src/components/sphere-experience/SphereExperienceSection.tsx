@@ -150,7 +150,6 @@ export function SphereExperienceSection({ dataSource, onCardClick, className }: 
   return (
     <section
       ref={sectionRef}
-      data-testid="home-card-sphere"
       data-load-state={loadState}
       data-warm-state="warming"
       data-near-viewport={isNearViewport ? "true" : "false"}

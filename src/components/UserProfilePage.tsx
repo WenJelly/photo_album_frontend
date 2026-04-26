@@ -7,7 +7,7 @@ import { preloadImage } from "@/lib/image-preload"
 import { canDeletePhoto } from "@/lib/photo-permissions"
 import { DELETE_PICTURE_CONFIRM_MESSAGE } from "@/lib/picture-delete"
 import { deletePicture, getPictureDetail, listPictures } from "@/lib/picture-api"
-import { getMyProfile, getUserProfile, updateMyProfile, type UserProfile } from "@/lib/user-api"
+import { getMyProfile, getUserProfile, updateMyProfile, uploadMyAvatarFile, type UserProfile } from "@/lib/user-api"
 import type { Photo } from "@/types/photo"
 
 import { PhotoGrid } from "./PhotoGrid"
@@ -82,6 +82,7 @@ export function UserProfilePage({ mode, userId, onNavigateToUser }: UserProfileP
   const [draftUserProfile, setDraftUserProfile] = useState("")
   const [profileFormError, setProfileFormError] = useState<string | null>(null)
   const [isSavingProfile, setIsSavingProfile] = useState(false)
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null)
   const [selectedPhotoDetail, setSelectedPhotoDetail] = useState<Photo | null>(null)
   const [selectedPhotoError, setSelectedPhotoError] = useState<string | null>(null)
@@ -381,6 +382,36 @@ export function UserProfilePage({ mode, userId, onNavigateToUser }: UserProfileP
     }
   }, [draftUserAvatar, draftUserName, draftUserProfile, normalizedDraftUserName, profile, syncDraftProfile, updateUser])
 
+  const handleAvatarUpload = useCallback(
+    async (file: File | null) => {
+      if (!file) {
+        return
+      }
+
+      setIsUploadingAvatar(true)
+      setProfileFormError(null)
+      setActionNotice(null)
+
+      try {
+        const nextProfile = await uploadMyAvatarFile(file)
+
+        setProfile(nextProfile)
+        setDraftUserAvatar(nextProfile.userAvatar)
+        updateUser({
+          userAvatar: nextProfile.userAvatar,
+          userName: nextProfile.userName,
+          userProfile: nextProfile.userProfile,
+        })
+        setActionNotice("头像已更新。")
+      } catch (error) {
+        setProfileFormError(getErrorMessage(error, "头像上传失败。"))
+      } finally {
+        setIsUploadingAvatar(false)
+      }
+    },
+    [updateUser],
+  )
+
   const handleDeletePreviewPhoto = useCallback(async () => {
     if (!previewPhoto) {
       return
@@ -482,7 +513,24 @@ export function UserProfilePage({ mode, userId, onNavigateToUser }: UserProfileP
                     />
                   </label>
                   <label className="block space-y-2">
-                    <span className="text-sm font-medium text-foreground">头像地址</span>
+                    <span className="text-sm font-medium text-foreground">上传头像</span>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      disabled={isUploadingAvatar || isSavingProfile}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0] ?? null
+                        void handleAvatarUpload(file)
+                        event.target.value = ""
+                      }}
+                      className="block w-full rounded-2xl border border-border/80 bg-white px-4 py-3 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-foreground file:px-3 file:py-1.5 file:text-background disabled:cursor-not-allowed disabled:opacity-60"
+                    />
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      仅支持 jpg、jpeg、png、webp，上传后会立即更新你自己的头像。
+                    </p>
+                  </label>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium text-foreground">头像地址（可选）</span>
                     <input
                       type="text"
                       value={draftUserAvatar}
@@ -529,7 +577,7 @@ export function UserProfilePage({ mode, userId, onNavigateToUser }: UserProfileP
             <div className="flex shrink-0 flex-wrap gap-2">
               {isEditingProfile ? (
                 <>
-                  <Button onClick={() => void handleSaveProfile()} disabled={isSavingProfile || !isProfileDirty}>
+                  <Button onClick={() => void handleSaveProfile()} disabled={isSavingProfile || isUploadingAvatar || !isProfileDirty}>
                     {isSavingProfile ? "保存中..." : "保存资料"}
                   </Button>
                   <Button
@@ -539,7 +587,7 @@ export function UserProfilePage({ mode, userId, onNavigateToUser }: UserProfileP
                       setProfileFormError(null)
                       setIsEditingProfile(false)
                     }}
-                    disabled={isSavingProfile}
+                    disabled={isSavingProfile || isUploadingAvatar}
                   >
                     取消
                   </Button>

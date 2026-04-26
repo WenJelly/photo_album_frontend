@@ -6,7 +6,7 @@ function normalizeImageSource(src?: string | null) {
   return normalizedSource ? normalizedSource : null
 }
 
-export function warmImageSource(src?: string | null) {
+function warmImageSource(src?: string | null) {
   const normalizedSource = normalizeImageSource(src)
 
   if (!normalizedSource || typeof Image === "undefined") {

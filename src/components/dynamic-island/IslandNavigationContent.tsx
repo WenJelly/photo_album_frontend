@@ -17,7 +17,6 @@ interface IslandNavigationContentProps {
   onMyProfileClick: () => void
   onRunStressDemo: () => void
   onUploadClick: () => void
-  reducedMotion: boolean
   user: AuthUser | null
 }
 
@@ -36,9 +35,8 @@ function IslandAvatar({
 }) {
   if (user.userAvatar) {
     return (
-      <span data-testid="dynamic-island-avatar-frame" className={cn("dynamic-island-avatar-frame", className)}>
+      <span className={cn("dynamic-island-avatar-frame", className)}>
         <img
-          data-testid="dynamic-island-avatar-media"
           src={user.userAvatar}
           alt=""
           className="dynamic-island-avatar-media dynamic-island-geometry-lock"
@@ -48,7 +46,7 @@ function IslandAvatar({
   }
 
   return (
-    <span data-testid="dynamic-island-avatar-frame" className={cn("dynamic-island-avatar-frame", className)}>
+    <span className={cn("dynamic-island-avatar-frame", className)}>
       <span className="dynamic-island-avatar-fallback dynamic-island-geometry-lock">
         <User className="size-4" />
       </span>
@@ -78,7 +76,6 @@ export function IslandNavigationContent({
   onMyProfileClick,
   onRunStressDemo,
   onUploadClick,
-  reducedMotion,
   user,
 }: IslandNavigationContentProps) {
   const isAdmin = user?.userRole === "admin"
@@ -88,9 +85,7 @@ export function IslandNavigationContent({
     return (
       <button
         type="button"
-        data-testid="dynamic-island-toggle"
         className="dynamic-island-compact-toggle dynamic-island-content-offset"
-        data-reduced-motion={String(reducedMotion)}
         onClick={onCompactToggle}
       >
         <span className="dynamic-island-brand">
@@ -137,13 +132,13 @@ export function IslandNavigationContent({
 
       <div className="dynamic-island-nav__actions">
         {showUploadAction ? (
-          <button type="button" data-testid="open-upload-dialog" onClick={onUploadClick} className={actionClass}>
+          <button type="button" onClick={onUploadClick} className={actionClass}>
             <Upload className="size-4" />
             <span>上传</span>
           </button>
         ) : null}
         {canRunStressDemo ? (
-          <button type="button" data-testid="open-stress-demo" onClick={onRunStressDemo} className={actionClass}>
+          <button type="button" onClick={onRunStressDemo} className={actionClass}>
             <Gauge className="size-4" />
             <span>一键压测</span>
           </button>

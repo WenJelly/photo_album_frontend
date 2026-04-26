@@ -126,7 +126,6 @@ export function PhotoPreviewOverlay({
 
   return (
     <div
-      data-testid="preview-backdrop"
       className="fixed inset-0 z-50 bg-[oklch(0.22_0.01_84_/_0.16)] backdrop-blur-[10px]"
       onClick={onClose}
     >
@@ -136,11 +135,9 @@ export function PhotoPreviewOverlay({
         } transition-opacity duration-300`}
       >
         <div
-          data-testid="preview-stage"
           className="relative flex min-h-[48vh] flex-1 items-center justify-center p-4 md:min-h-0 md:px-10 md:py-10"
         >
           <div
-            data-testid="preview-body"
             className="relative flex w-fit max-w-full flex-col md:max-w-[1600px] md:flex-row md:items-start"
             role="dialog"
             aria-modal="true"
@@ -151,7 +148,6 @@ export function PhotoPreviewOverlay({
               {isDesktop ? (
                 <button
                   type="button"
-                  data-testid="preview-prev"
                   aria-label="上一张图片"
                   onClick={() => previousPhoto && onSelect(previousPhoto)}
                   disabled={!previousPhoto}
@@ -163,7 +159,6 @@ export function PhotoPreviewOverlay({
               {isDesktop ? (
                 <button
                   type="button"
-                  data-testid="preview-next"
                   aria-label="下一张图片"
                   onClick={() => nextPhoto && onSelect(nextPhoto)}
                   disabled={!nextPhoto}
@@ -285,7 +280,6 @@ export function PhotoPreviewOverlay({
                 {!isDesktop ? (
                   <div className="grid grid-cols-2 gap-3">
                     <Button
-                      data-testid="preview-prev-mobile"
                       variant="secondary"
                       onClick={() => previousPhoto && onSelect(previousPhoto)}
                       disabled={!previousPhoto}
@@ -293,7 +287,6 @@ export function PhotoPreviewOverlay({
                       上一张
                     </Button>
                     <Button
-                      data-testid="preview-next-mobile"
                       variant="secondary"
                       onClick={() => nextPhoto && onSelect(nextPhoto)}
                       disabled={!nextPhoto}

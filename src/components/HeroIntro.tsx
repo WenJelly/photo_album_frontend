@@ -28,9 +28,8 @@ const homeSphereDataSource: SphereDataSource = {
 export function HeroIntro({ heroRef }: HeroIntroProps) {
   return (
     <>
-      <section ref={heroRef} data-testid="home-hero-shell" className="home-hero-shell w-full pb-0 pt-0">
+      <section ref={heroRef} className="home-hero-shell w-full pb-0 pt-0">
         <div
-          data-testid="home-hero"
           className="home-hero-surface min-h-screen w-full bg-[#d8d3cb]"
           style={{
             backgroundImage: `url(${HOME_HERO_IMAGE_URL})`,

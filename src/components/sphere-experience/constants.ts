@@ -14,7 +14,7 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
 }
 
-export function sanitizeSphereImageRecord(record: SphereImageRecord) {
+function sanitizeSphereImageRecord(record: SphereImageRecord) {
   const imageUrl = record.imageUrl.trim()
   const fallbackImageUrl = record.fallbackImageUrl?.trim()
 
@@ -30,7 +30,7 @@ export function normalizeSphereImageRecords(records: SphereImageRecord[]) {
   return records.map(sanitizeSphereImageRecord).filter((record) => record.imageUrl || record.fallbackImageUrl)
 }
 
-export function createPlaceholderSphereRecord() {
+function createPlaceholderSphereRecord() {
   return {
     id: "placeholder",
     imageUrl: "",

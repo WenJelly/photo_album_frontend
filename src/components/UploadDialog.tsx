@@ -19,7 +19,6 @@ interface UploadDialogProps {
 interface TextFieldProps {
   autoFocus?: boolean
   label: string
-  testId: string
   value: string
   onChange: (value: string) => void
   placeholder?: string
@@ -175,7 +174,6 @@ export function UploadDialog({ open, onClose, onUploadTaskEvent, onUploaded }: U
 
   return (
     <div
-      data-testid="upload-backdrop"
       className="fixed inset-0 z-[75] bg-[rgba(17,17,19,0.42)] backdrop-blur-[14px]"
       onMouseDown={handleBackdropMouseDown}
       onClick={handleBackdropClick}
@@ -209,7 +207,6 @@ export function UploadDialog({ open, onClose, onUploadTaskEvent, onUploaded }: U
           <div className="mt-7 flex rounded-full border border-border/80 bg-white/80 p-1">
             <button
               type="button"
-              data-testid="upload-mode-file"
               aria-pressed={mode === "file"}
               onClick={() => {
                 setMode("file")
@@ -224,7 +221,6 @@ export function UploadDialog({ open, onClose, onUploadTaskEvent, onUploaded }: U
             </button>
             <button
               type="button"
-              data-testid="upload-mode-url"
               aria-pressed={mode === "url"}
               onClick={() => {
                 setMode("url")
@@ -244,7 +240,6 @@ export function UploadDialog({ open, onClose, onUploadTaskEvent, onUploaded }: U
               <label className="block space-y-2">
                 <span className="text-sm font-medium text-foreground">图片文件</span>
                 <input
-                  data-testid="upload-file-input"
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   onChange={(event) => {
@@ -259,7 +254,6 @@ export function UploadDialog({ open, onClose, onUploadTaskEvent, onUploaded }: U
               <TextField
                 autoFocus
                 label="图片地址"
-                testId="upload-url-input"
                 value={fileUrl}
                 placeholder="https://example.com/demo.webp"
                 onChange={(value) => {
@@ -271,28 +265,24 @@ export function UploadDialog({ open, onClose, onUploadTaskEvent, onUploaded }: U
 
             <TextField
               label="图片名称"
-              testId="upload-name-input"
               value={picName}
               onChange={setPicName}
               placeholder="可选"
             />
             <TextField
               label="简介"
-              testId="upload-introduction-input"
               value={introduction}
               onChange={setIntroduction}
               placeholder="可选"
             />
             <TextField
               label="分类"
-              testId="upload-category-input"
               value={category}
               onChange={setCategory}
               placeholder="例如 travel"
             />
             <TextField
               label="标签"
-              testId="upload-tags-input"
               value={tagsInput}
               onChange={setTagsInput}
               placeholder="使用逗号分隔，例如 sea, sunset"
@@ -306,7 +296,6 @@ export function UploadDialog({ open, onClose, onUploadTaskEvent, onUploaded }: U
 
             <Button
               type="submit"
-              data-testid="upload-submit"
               className="mt-2 h-11 w-full rounded-2xl"
               disabled={isSubmitting}
             >
@@ -319,12 +308,11 @@ export function UploadDialog({ open, onClose, onUploadTaskEvent, onUploaded }: U
   )
 }
 
-function TextField({ autoFocus, label, testId, value, onChange, placeholder }: TextFieldProps) {
+function TextField({ autoFocus, label, value, onChange, placeholder }: TextFieldProps) {
   return (
     <label className="block space-y-2">
       <span className="text-sm font-medium text-foreground">{label}</span>
       <input
-        data-testid={testId}
         autoFocus={autoFocus}
         type="text"
         value={value}

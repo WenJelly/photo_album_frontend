@@ -28,7 +28,6 @@ export function MiniTerminal({ logs, open, reducedMotion }: MiniTerminalProps) {
           exit={reducedMotion ? { opacity: 0 } : { opacity: 0, y: -8 }}
           transition={reducedMotion ? { duration: 0.16 } : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
           className="dynamic-island-terminal"
-          data-testid="island-task-terminal"
         >
           <div className="dynamic-island-terminal__header">
             <span className="dynamic-island-terminal__dot dynamic-island-terminal__dot--danger" />

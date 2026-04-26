@@ -55,7 +55,7 @@ function isApiEnvelope<T>(payload: unknown): payload is ApiEnvelope<T> {
   )
 }
 
-export function parseApiJsonPayload(payload: string) {
+function parseApiJsonPayload(payload: string) {
   const normalizedPayload = payload.trim()
 
   if (!normalizedPayload || !/^[[{]/.test(normalizedPayload)) {
@@ -70,7 +70,7 @@ export function parseApiJsonPayload(payload: string) {
   return JSON.parse(protectedPayload) as unknown
 }
 
-export function stringifyApiJsonPayload(payload: unknown) {
+function stringifyApiJsonPayload(payload: unknown) {
   return JSON.stringify(payload)
 }
 

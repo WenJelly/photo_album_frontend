@@ -254,7 +254,6 @@ export function AuthDialog({ open, onClose }: AuthDialogProps) {
 
   return (
     <div
-      data-testid="auth-backdrop"
       className="fixed inset-0 z-[70] bg-[rgba(17,17,19,0.42)] backdrop-blur-[14px]"
       onMouseDown={handleBackdropMouseDown}
       onClick={handleBackdropClick}
