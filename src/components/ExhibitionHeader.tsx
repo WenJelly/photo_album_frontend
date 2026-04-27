@@ -21,6 +21,7 @@ interface ExhibitionHeaderProps {
   onGalleryClick: () => void
   onHomeClick: () => void
   onLoginClick: () => void
+  onLogoutClick: () => void
   onMyProfileClick: () => void
   onPreviewTaskPhoto: () => void
   onRunStressDemo: () => void
@@ -84,6 +85,7 @@ export function ExhibitionHeader({
   onGalleryClick,
   onHomeClick,
   onLoginClick,
+  onLogoutClick,
   onMyProfileClick,
   onPreviewTaskPhoto,
   onRunStressDemo,
@@ -92,7 +94,7 @@ export function ExhibitionHeader({
   task,
   variant,
 }: ExhibitionHeaderProps) {
-  const { user, isLoggedIn, logout } = useAuth()
+  const { user, isLoggedIn } = useAuth()
   const [viewportWidth, setViewportWidth] = useState(readViewportWidth)
   const {
     onBlurCapture,
@@ -202,7 +204,7 @@ export function ExhibitionHeader({
                     onGalleryClick={onGalleryClick}
                     onHomeClick={onHomeClick}
                     onLoginClick={onLoginClick}
-                    onLogoutClick={logout}
+                    onLogoutClick={onLogoutClick}
                     onMyProfileClick={onMyProfileClick}
                     onRunStressDemo={onRunStressDemo}
                     onUploadClick={onUploadClick}

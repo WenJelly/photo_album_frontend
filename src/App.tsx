@@ -12,6 +12,7 @@ import { AuthProvider } from "@/contexts/AuthContext"
 import { useAuth } from "@/contexts/auth-context"
 import { normalizeEntityId } from "@/lib/entity-id"
 import { preloadImage } from "@/lib/image-preload"
+import { getManualLogoutRedirectRoute } from "@/lib/manual-logout-route"
 import { DELETE_PICTURE_CONFIRM_MESSAGE } from "@/lib/picture-delete"
 import { canDeletePhoto } from "@/lib/photo-permissions"
 import { deletePicture, getPictureDetail, listPicturesCursor } from "@/lib/picture-api"
@@ -189,7 +190,7 @@ function AppShell() {
   const homeHeroRef = useRef<HTMLElement | null>(null)
   const stressDemoTimeoutsRef = useRef<number[]>([])
   const galleryMoreSentinelRef = useRef<HTMLDivElement | null>(null)
-  const { user, isLoggedIn } = useAuth()
+  const { user, isLoggedIn, logout } = useAuth()
 
   const [route, setRoute] = useState<Route>(initialRoute)
   const [galleryPhotos, setGalleryPhotos] = useState<Photo[]>([])
@@ -334,6 +335,18 @@ function AppShell() {
     },
     [navigateToRoute, user],
   )
+
+  const handleLogout = useCallback(() => {
+    const redirectPage = getManualLogoutRedirectRoute(currentPage)
+
+    setIsAuthDialogOpen(false)
+
+    if (redirectPage) {
+      navigateToRoute({ page: redirectPage }, { replace: true })
+    }
+
+    logout()
+  }, [currentPage, logout, navigateToRoute])
 
   const handlePhotographerNavigation = useCallback(
     (photo: Photo) => {
@@ -860,6 +873,7 @@ function AppShell() {
         onGalleryClick={() => navigateToRoute({ page: "gallery" })}
         onAdminReviewClick={() => navigateToRoute({ page: "adminReview" })}
         onLoginClick={() => setIsAuthDialogOpen(true)}
+        onLogoutClick={handleLogout}
         onMyProfileClick={() => navigateToRoute({ page: "me" })}
         onPreviewTaskPhoto={handlePreviewTaskPhoto}
         onRunStressDemo={handleRunStressDemo}
