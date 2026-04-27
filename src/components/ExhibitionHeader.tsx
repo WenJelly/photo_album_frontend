@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react"
+
 import { AnimatePresence, motion } from "framer-motion"
 
 import { useAuth } from "@/contexts/auth-context"
@@ -24,7 +26,6 @@ interface ExhibitionHeaderProps {
   onRunStressDemo: () => void
   onToggleTaskTerminal: () => void
   onUploadClick: () => void
-  routeKey: string
   task: IslandTask | null
   variant: ExhibitionHeaderVariant
 }
@@ -33,19 +34,43 @@ const shellSpringTransition = { type: "spring", stiffness: 260, damping: 32, mas
 const reducedMotionTransition = { duration: 0.16 } as const
 const contentTransition = { duration: 0.22, ease: [0.22, 1, 0.36, 1] } as const
 
-function getIslandWidthClass(view: "expanded" | "compact" | "task") {
-  if (view === "compact") {
-    return "w-[min(22rem,calc(100vw-1.5rem))] sm:w-[22rem]"
+const VIEWPORT_MARGIN_REM = 1.5
+const VIEW_WIDTHS_REM: Record<"expanded" | "compact" | "task", number> = {
+  compact: 22,
+  expanded: 60,
+  task: 64,
+}
+
+function readViewportWidth() {
+  if (typeof window === "undefined") {
+    return 1280
   }
 
-  if (view === "task") {
-    return "w-[min(64rem,calc(100vw-1.5rem))]"
+  return window.innerWidth || document.documentElement.clientWidth || 1280
+}
+
+function readRootFontSize() {
+  if (typeof window === "undefined") {
+    return 16
   }
 
-  return "w-[min(60rem,calc(100vw-1.5rem))]"
+  const parsedFontSize = Number.parseFloat(window.getComputedStyle(document.documentElement).fontSize)
+  return Number.isFinite(parsedFontSize) && parsedFontSize > 0 ? parsedFontSize : 16
+}
+
+function resolveIslandWidth(view: "expanded" | "compact" | "task", viewportWidth: number) {
+  const rootFontSize = readRootFontSize()
+  const viewportBoundWidth = Math.max(viewportWidth - VIEWPORT_MARGIN_REM * rootFontSize, 0)
+  const preferredWidth = VIEW_WIDTHS_REM[view] * rootFontSize
+
+  return Math.min(preferredWidth, viewportBoundWidth)
 }
 
 function getContentFrameClass(view: "expanded" | "compact" | "task") {
+  if (view === "task") {
+    return "dynamic-island-content-frame dynamic-island-content-frame--shell"
+  }
+
   return view === "compact"
     ? "dynamic-island-content-frame dynamic-island-content-frame--shell"
     : "dynamic-island-content-frame dynamic-island-content-frame--intrinsic"
@@ -64,21 +89,34 @@ export function ExhibitionHeader({
   onRunStressDemo,
   onToggleTaskTerminal,
   onUploadClick,
-  routeKey,
   task,
   variant,
 }: ExhibitionHeaderProps) {
   const { user, isLoggedIn, logout } = useAuth()
+  const [viewportWidth, setViewportWidth] = useState(readViewportWidth)
   const {
     onBlurCapture,
+    onCompactMouseEnter,
     onCompactToggle,
-    onFocusCapture,
-    onMouseEnter,
     onMouseLeave,
     prefersReducedMotion,
     rootRef,
     view,
   } = useIslandController({ hasTask: task !== null })
+  const islandWidth = resolveIslandWidth(view, viewportWidth)
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return
+    }
+
+    const handleResize = () => setViewportWidth(readViewportWidth())
+
+    handleResize()
+    window.addEventListener("resize", handleResize)
+
+    return () => window.removeEventListener("resize", handleResize)
+  }, [])
 
   const shellTransition = prefersReducedMotion ? reducedMotionTransition : shellSpringTransition
   const innerContentTransition = prefersReducedMotion ? reducedMotionTransition : contentTransition
@@ -89,9 +127,9 @@ export function ExhibitionHeader({
         exit: { opacity: 0 },
       }
     : {
-        initial: { opacity: 0, y: 6, scale: 0.96 },
-        animate: { opacity: 1, y: 0, scale: 1 },
-        exit: { opacity: 0, y: -6, scale: 0.96 },
+        initial: { opacity: 0, y: 6 },
+        animate: { opacity: 1, y: 0 },
+        exit: { opacity: 0, y: -6 },
       }
 
   return (
@@ -100,20 +138,17 @@ export function ExhibitionHeader({
         layoutRoot
         ref={rootRef}
         onBlurCapture={onBlurCapture}
-        onFocusCapture={onFocusCapture}
-        onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
         className="pointer-events-auto"
       >
         <motion.div
-          key={routeKey}
-          layout
+          animate={{ width: islandWidth }}
           className={cn(
-            getIslandWidthClass(view),
             "dynamic-island-shell",
             variant === "transparent" ? "dynamic-island-shell--transparent" : "dynamic-island-shell--solid",
             view === "task" && "dynamic-island-shell--task",
           )}
+          style={{ width: islandWidth }}
           transition={shellTransition}
         >
           {view !== "task" ? (
@@ -123,6 +158,7 @@ export function ExhibitionHeader({
                   type="button"
                   className="dynamic-island-logo-anchor__button"
                   onClick={view === "compact" ? onCompactToggle : onHomeClick}
+                  onMouseEnter={view === "compact" ? onCompactMouseEnter : undefined}
                   aria-label={view === "compact" ? "Expand navigation" : "Navigate home"}
                 >
                   <BoluoLogo className="h-9 w-auto object-contain" />
@@ -131,7 +167,7 @@ export function ExhibitionHeader({
             </div>
           ) : null}
           <div className="dynamic-island-content-stage">
-            <AnimatePresence mode="popLayout" initial={false}>
+            <AnimatePresence initial={false}>
               {view === "task" && task ? (
                 <motion.div
                   key="task"
@@ -149,7 +185,7 @@ export function ExhibitionHeader({
                 </motion.div>
               ) : (
                 <motion.div
-                  key={view}
+                  key="nav"
                   {...contentAnimation}
                   className={getContentFrameClass(view)}
                   transition={innerContentTransition}
@@ -159,7 +195,9 @@ export function ExhibitionHeader({
                     compact={view === "compact"}
                     currentPage={currentPage}
                     isLoggedIn={isLoggedIn}
+                    menuTone={variant}
                     onAdminReviewClick={onAdminReviewClick}
+                    onCompactMouseEnter={onCompactMouseEnter}
                     onCompactToggle={onCompactToggle}
                     onGalleryClick={onGalleryClick}
                     onHomeClick={onHomeClick}

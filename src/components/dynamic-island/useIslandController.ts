@@ -179,24 +179,17 @@ export function useIslandController({ hasTask }: UseIslandControllerOptions) {
         setIsFocusExpanded(false)
       }
     },
+    onCompactMouseEnter() {
+      if (!hasTask && canHover && compactPreferenceRef.current) {
+        setIsHoverExpanded(true)
+      }
+    },
     onCompactToggle() {
       if (hasTask || canHover) {
         return
       }
 
       setIsManualExpanded((current) => !current)
-    },
-    onFocusCapture() {
-      if (hasTask) {
-        return
-      }
-
-      setIsFocusExpanded(true)
-    },
-    onMouseEnter() {
-      if (!hasTask && canHover && compactPreferenceRef.current) {
-        setIsHoverExpanded(true)
-      }
     },
     onMouseLeave() {
       if (canHover) {

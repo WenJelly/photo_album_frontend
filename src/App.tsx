@@ -213,8 +213,6 @@ function AppShell() {
 
   const currentPage = route.page
   const routeUserId = route.page === "user" ? route.userId : null
-  const headerRouteKey = getPathFromRoute(route)
-  const headerInstanceKey = `${headerRouteKey}:${islandTask ? "task" : "nav"}`
   const isHome = currentPage === "home"
   const headerVariant: HeaderVariant = isHome && isHomeHeroVisible ? "transparent" : "solid"
   const isAdmin = user?.userRole === "admin"
@@ -855,10 +853,8 @@ function AppShell() {
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       <ExhibitionHeader
-        key={headerInstanceKey}
         canRunStressDemo={canRunStressDemo}
         currentPage={currentPage}
-        routeKey={headerRouteKey}
         onDismissTask={handleDismissTask}
         onHomeClick={() => navigateToRoute({ page: "home" })}
         onGalleryClick={() => navigateToRoute({ page: "gallery" })}
@@ -966,4 +962,3 @@ function App() {
 }
 
 export default App
-

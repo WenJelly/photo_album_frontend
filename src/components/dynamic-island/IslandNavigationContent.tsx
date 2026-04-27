@@ -1,4 +1,5 @@
-import { Gauge, LogOut, Upload, User } from "lucide-react"
+import { Menu } from "@base-ui/react/menu"
+import { ChevronRight, Gauge, LogOut, Upload, User } from "lucide-react"
 
 import type { AuthUser } from "@/contexts/auth-context"
 import { cn } from "@/lib/utils"
@@ -8,7 +9,9 @@ interface IslandNavigationContentProps {
   compact: boolean
   currentPage: "home" | "gallery" | "adminReview" | "me" | "user"
   isLoggedIn: boolean
+  menuTone: "transparent" | "solid"
   onAdminReviewClick: () => void
+  onCompactMouseEnter: () => void
   onCompactToggle: () => void
   onGalleryClick: () => void
   onHomeClick: () => void
@@ -54,12 +57,75 @@ function IslandAvatar({
   )
 }
 
-function CompactAvatar({ isLoggedIn, user }: { isLoggedIn: boolean; user: AuthUser | null }) {
-  if (!isLoggedIn) {
-    return <span className="dynamic-island-login-chip">Login</span>
-  }
-
-  return <IslandAvatar className="size-9" user={user!} />
+function AccountAvatarMenu({
+  tone,
+  size,
+  user,
+  onLogoutClick,
+  onMyProfileClick,
+}: {
+  tone: "transparent" | "solid"
+  size: string
+  user: AuthUser
+  onLogoutClick: () => void
+  onMyProfileClick: () => void
+}) {
+  return (
+    <Menu.Root modal={false}>
+      <Menu.Trigger
+        type="button"
+        className="dynamic-island-avatar-trigger"
+        style={{ width: size, height: size }}
+        aria-label="打开账户菜单"
+      >
+        <span className="avatar-prism-ring">
+          <IslandAvatar className="h-full w-full" user={user} />
+        </span>
+      </Menu.Trigger>
+      <Menu.Portal>
+        <Menu.Positioner sideOffset={12} align="end" className="dynamic-island-account-menu__positioner">
+          <Menu.Popup className={cn("dynamic-island-account-menu", `dynamic-island-account-menu--${tone}`)}>
+            <div className="dynamic-island-account-menu__header">
+              <div className="dynamic-island-account-menu__eyebrow-row">
+                <span className="dynamic-island-account-menu__eyebrow">ACCOUNT</span>
+                <span className="dynamic-island-account-menu__eyebrow-glint" aria-hidden="true" />
+              </div>
+              <div className="dynamic-island-account-menu__identity">
+                <span className="dynamic-island-account-menu__prism" aria-hidden="true" />
+                <div className="min-w-0">
+                  <p className="dynamic-island-account-menu__name dynamic-island-text-container">{user.userName}</p>
+                  {user.userEmail ? (
+                    <p className="dynamic-island-account-menu__meta dynamic-island-text-container">{user.userEmail}</p>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+            <Menu.Separator className="dynamic-island-account-menu__separator" />
+            <Menu.Item
+              className="dynamic-island-account-menu__item dynamic-island-account-menu__item--profile"
+              onClick={onMyProfileClick}
+            >
+              <span className="dynamic-island-account-menu__item-icon" aria-hidden="true">
+                <User className="size-4" />
+              </span>
+              <span className="dynamic-island-account-menu__item-label">个人信息</span>
+              <ChevronRight className="dynamic-island-account-menu__item-trailing size-4" aria-hidden="true" />
+            </Menu.Item>
+            <Menu.Item
+              className="dynamic-island-account-menu__item dynamic-island-account-menu__item--logout"
+              onClick={onLogoutClick}
+            >
+              <span className="dynamic-island-account-menu__item-icon" aria-hidden="true">
+                <LogOut className="size-4" />
+              </span>
+              <span className="dynamic-island-account-menu__item-label">退出登录</span>
+              <ChevronRight className="dynamic-island-account-menu__item-trailing size-4" aria-hidden="true" />
+            </Menu.Item>
+          </Menu.Popup>
+        </Menu.Positioner>
+      </Menu.Portal>
+    </Menu.Root>
+  )
 }
 
 export function IslandNavigationContent({
@@ -67,7 +133,9 @@ export function IslandNavigationContent({
   compact,
   currentPage,
   isLoggedIn,
+  menuTone,
   onAdminReviewClick,
+  onCompactMouseEnter,
   onCompactToggle,
   onGalleryClick,
   onHomeClick,
@@ -83,17 +151,32 @@ export function IslandNavigationContent({
 
   if (compact) {
     return (
-      <button
-        type="button"
-        className="dynamic-island-compact-toggle dynamic-island-content-offset"
-        onClick={onCompactToggle}
-      >
-        <span className="dynamic-island-brand">
-          <span className="dynamic-island-brand__title dynamic-island-text-container">WenJelly</span>
-          <span className="dynamic-island-brand__caption dynamic-island-text-container">Standby Capsule</span>
-        </span>
-        <CompactAvatar isLoggedIn={isLoggedIn} user={user} />
-      </button>
+      <div className="dynamic-island-compact-bar dynamic-island-content-offset">
+        <button
+          type="button"
+          className="dynamic-island-compact-toggle"
+          onClick={onCompactToggle}
+          onMouseEnter={onCompactMouseEnter}
+        >
+          <span className="dynamic-island-brand">
+            <span className="dynamic-island-brand__title dynamic-island-text-container">WenJelly</span>
+            <span className="dynamic-island-brand__caption dynamic-island-text-container">Standby Capsule</span>
+          </span>
+        </button>
+        {isLoggedIn ? (
+          <AccountAvatarMenu
+            tone={menuTone}
+            size="2.6rem"
+            user={user!}
+            onMyProfileClick={onMyProfileClick}
+            onLogoutClick={onLogoutClick}
+          />
+        ) : (
+          <button type="button" onClick={onLoginClick} className="dynamic-island-compact-login-button">
+            登录
+          </button>
+        )}
+      </div>
     )
   }
 
@@ -144,15 +227,13 @@ export function IslandNavigationContent({
           </button>
         ) : null}
         {isLoggedIn ? (
-          <>
-            <button type="button" onClick={onMyProfileClick} className={actionClass}>
-              <IslandAvatar className="size-6" user={user!} />
-              <span className="dynamic-island-text-container max-w-[8ch]">{user?.userName}</span>
-            </button>
-            <button type="button" onClick={onLogoutClick} className="dynamic-island-icon-button" aria-label="退出登录">
-              <LogOut className="size-4" />
-            </button>
-          </>
+          <AccountAvatarMenu
+            tone={menuTone}
+            size="2.5rem"
+            user={user!}
+            onMyProfileClick={onMyProfileClick}
+            onLogoutClick={onLogoutClick}
+          />
         ) : (
           <button type="button" onClick={onLoginClick} className={actionClass}>
             登录
