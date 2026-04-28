@@ -34,7 +34,6 @@ export interface AdminPictureRecord {
   createTime?: string
   editTime?: string
   updateTime?: string
-  picColor?: string
   viewCount?: number
   likeCount?: number
 }

@@ -207,8 +207,8 @@
   --dynamic-island-control-border: oklch(0.97 0.03 265 / 0.22);
   --dynamic-island-focus-ring: oklch(0.93 0.05 264 / 0.46);
   --dynamic-island-text-primary: oklch(0.99 0.012 270 / 0.96);
-  --dynamic-island-text-secondary: oklch(0.91 0.032 264 / 0.78);
-  --dynamic-island-text-muted: oklch(0.86 0.038 270 / 0.64);
+  --dynamic-island-text-secondary: oklch(0.96 0.024 264 / 0.9);
+  --dynamic-island-text-muted: oklch(0.93 0.028 270 / 0.8);
   --dynamic-island-accent: oklch(0.84 0.09 270 / 0.96);
   position: relative;
   overflow: hidden;
@@ -579,7 +579,7 @@
     oklch(0.66 0.065 286 / 0.1)
   );
   --dynamic-island-text-primary: oklch(0.99 0.012 270 / 0.96);
-  --dynamic-island-text-secondary: oklch(0.91 0.032 264 / 0.78);
+  --dynamic-island-text-secondary: oklch(0.96 0.024 264 / 0.9);
   position: relative;
   display: flex;
   min-width: 13.4rem;
@@ -899,6 +899,7 @@
 
 .dynamic-island-metric__label {
   color: var(--dynamic-island-text-muted);
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.12em;
 }
@@ -920,6 +921,7 @@
   justify-content: space-between;
   color: var(--dynamic-island-text-secondary);
   font-size: 0.78rem;
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }

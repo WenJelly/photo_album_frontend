@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react"
 
-import { decodeBlurHashToPixels, isValidBlurHash } from "@/lib/blurhash"
 import { cn } from "@/lib/utils"
 
 interface ProgressiveImageProps {
@@ -8,13 +7,10 @@ interface ProgressiveImageProps {
   alt: string
   width: number
   height: number
-  dominantColor?: string
-  blurHash?: string
   className?: string
   imageClassName?: string
 }
 
-const BLURHASH_CANVAS_SIZE = 32
 const IMAGE_PREFETCH_ROOT_MARGIN = "800px 0px"
 
 function createImageState(src: string) {
@@ -25,58 +21,16 @@ function createImageState(src: string) {
   }
 }
 
-function BlurHashCanvas({ blurHash }: { blurHash: string }) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null)
-
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) {
-      return
-    }
-
-    const pixels = decodeBlurHashToPixels(blurHash, BLURHASH_CANVAS_SIZE, BLURHASH_CANVAS_SIZE)
-    if (!pixels) {
-      return
-    }
-
-    try {
-      const context = canvas.getContext("2d")
-      if (!context) {
-        return
-      }
-
-      const imageData = context.createImageData(BLURHASH_CANVAS_SIZE, BLURHASH_CANVAS_SIZE)
-      imageData.data.set(pixels)
-      context.putImageData(imageData, 0, 0)
-    } catch {
-      // jsdom and older browsers can lack a real canvas context; the color fallback remains visible.
-    }
-  }, [blurHash])
-
-  return (
-    <canvas
-      ref={canvasRef}
-      width={BLURHASH_CANVAS_SIZE}
-      height={BLURHASH_CANVAS_SIZE}
-      aria-hidden="true"
-      className="absolute inset-0 h-full w-full scale-105 object-cover blur-2xl"
-    />
-  )
-}
-
 export function ProgressiveImage({
   src,
   alt,
   width,
   height,
-  dominantColor,
-  blurHash,
   className,
   imageClassName,
 }: ProgressiveImageProps) {
   const frameRef = useRef<HTMLDivElement | null>(null)
   const [imageState, setImageState] = useState(() => createImageState(src))
-  const canRenderBlurHash = isValidBlurHash(blurHash)
 
   if (imageState.src !== src) {
     setImageState(createImageState(src))
@@ -115,10 +69,8 @@ export function ProgressiveImage({
       className={cn("relative h-full w-full overflow-hidden", className)}
       style={{
         aspectRatio: `${width} / ${height}`,
-        backgroundColor: dominantColor || "#ece9e3",
       }}
     >
-      {canRenderBlurHash && blurHash ? <BlurHashCanvas blurHash={blurHash} /> : null}
       <img
         src={imageState.shouldLoad ? src : undefined}
         alt={alt}

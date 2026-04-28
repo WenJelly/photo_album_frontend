@@ -14,8 +14,6 @@ export interface Photo {
   location: string
   tags: string[]
   format?: string
-  dominantColor?: string
-  blurHash?: string
   viewCount?: number
   likeCount?: number
   createdAt?: string
@@ -23,4 +21,5 @@ export interface Photo {
   reviewStatus?: number
   reviewMessage?: string
   userId?: string
+  userAvatar?: string
 }

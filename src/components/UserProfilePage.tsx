@@ -9,6 +9,7 @@ import { DELETE_PICTURE_CONFIRM_MESSAGE } from "@/lib/picture-delete"
 import { deletePicture, getPictureDetail, listPictures } from "@/lib/picture-api"
 import { getMyProfile, getUserProfile, updateMyProfile, uploadMyAvatarFile, type UserProfile } from "@/lib/user-api"
 import type { Photo } from "@/types/photo"
+import type { PhotoPreviewOriginRect } from "@/types/photo-preview"
 
 import { PhotoGrid } from "./PhotoGrid"
 import { PhotoPreviewOverlay } from "./PhotoPreviewOverlay"
@@ -86,6 +87,7 @@ export function UserProfilePage({ mode, userId, onNavigateToUser }: UserProfileP
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null)
   const [selectedPhotoDetail, setSelectedPhotoDetail] = useState<Photo | null>(null)
   const [selectedPhotoError, setSelectedPhotoError] = useState<string | null>(null)
+  const [selectedPhotoOriginRect, setSelectedPhotoOriginRect] = useState<PhotoPreviewOriginRect | null>(null)
   const [isPreviewLoading, setIsPreviewLoading] = useState(false)
   const [isDeletingPreviewPhoto, setIsDeletingPreviewPhoto] = useState(false)
   const ownerFallbackName = isMe ? profile?.userName ?? user?.userName : profile?.userName
@@ -130,6 +132,7 @@ export function UserProfilePage({ mode, userId, onNavigateToUser }: UserProfileP
     setSelectedPhotoId(null)
     setSelectedPhotoDetail(null)
     setSelectedPhotoError(null)
+    setSelectedPhotoOriginRect(null)
     setIsPreviewLoading(false)
     setIsDeletingPreviewPhoto(false)
   }, [])
@@ -234,11 +237,12 @@ export function UserProfilePage({ mode, userId, onNavigateToUser }: UserProfileP
     [clearSelectedPhoto, resolvedUserId],
   )
 
-  const openPhoto = useCallback((photo: Photo) => {
+  const openPhoto = useCallback((photo: Photo, originRect?: PhotoPreviewOriginRect) => {
     const cachedPhotoDetail = detailCacheRef.current.get(photo.id)
 
     setSelectedPhotoDetail(cachedPhotoDetail ?? photo)
     setSelectedPhotoError(null)
+    setSelectedPhotoOriginRect(originRect ?? null)
     setIsPreviewLoading(!cachedPhotoDetail)
     setSelectedPhotoId(photo.id)
     preloadImage(cachedPhotoDetail?.src ?? photo.src)
@@ -670,6 +674,7 @@ export function UserProfilePage({ mode, userId, onNavigateToUser }: UserProfileP
         <PhotoPreviewOverlay
           photo={previewPhoto}
           photos={displayedPhotos}
+          originRect={selectedPhotoOriginRect}
           onClose={clearSelectedPhoto}
           onDelete={() => void handleDeletePreviewPhoto()}
           onPhotographerClick={handlePhotographerNavigation}

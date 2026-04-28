@@ -20,6 +20,7 @@ import type { UploadProgressSnapshot } from "@/lib/upload-progress"
 import { cn } from "@/lib/utils"
 import type { IslandTask, UploadTaskEvent } from "@/types/island-task"
 import type { Photo } from "@/types/photo"
+import type { PhotoPreviewOriginRect } from "@/types/photo-preview"
 
 type Route =
   | { page: "home" }
@@ -209,6 +210,7 @@ function AppShell() {
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null)
   const [selectedPhotoDetail, setSelectedPhotoDetail] = useState<Photo | null>(null)
   const [selectedPhotoError, setSelectedPhotoError] = useState<string | null>(null)
+  const [selectedPhotoOriginRect, setSelectedPhotoOriginRect] = useState<PhotoPreviewOriginRect | null>(null)
   const [isPreviewLoading, setIsPreviewLoading] = useState(false)
   const [isDeletingPreviewPhoto, setIsDeletingPreviewPhoto] = useState(false)
 
@@ -261,6 +263,7 @@ function AppShell() {
     setSelectedPhotoId(null)
     setSelectedPhotoDetail(null)
     setSelectedPhotoError(null)
+    setSelectedPhotoOriginRect(null)
     setIsPreviewLoading(false)
     setIsDeletingPreviewPhoto(false)
   }, [])
@@ -274,11 +277,12 @@ function AppShell() {
     setGalleryLoadState("loading")
   }, [])
 
-  const openPhoto = useCallback((photo: Photo) => {
+  const openPhoto = useCallback((photo: Photo, originRect?: PhotoPreviewOriginRect) => {
     const cachedPhotoDetail = photoDetailCacheRef.current.get(photo.id)
 
     setSelectedPhotoDetail(cachedPhotoDetail ?? photo)
     setSelectedPhotoError(null)
+    setSelectedPhotoOriginRect(originRect ?? null)
     setIsPreviewLoading(!cachedPhotoDetail)
     setSelectedPhotoId(photo.id)
     preloadImage(cachedPhotoDetail?.src ?? photo.src)
@@ -834,6 +838,7 @@ function AppShell() {
     photoDetailCacheRef.current.set(photo.id, photo)
     setSelectedPhotoDetail(photo)
     setSelectedPhotoError(null)
+    setSelectedPhotoOriginRect(null)
     setIsPreviewLoading(false)
     setSelectedPhotoId(photo.id)
     preloadImage(photo.src)
@@ -953,6 +958,7 @@ function AppShell() {
         <PhotoPreviewOverlay
           photo={previewPhoto}
           photos={previewPhotos}
+          originRect={selectedPhotoOriginRect}
           canDelete={canDeletePreviewPhoto}
           isDeleting={isDeletingPreviewPhoto}
           isLoading={isPreviewLoading}

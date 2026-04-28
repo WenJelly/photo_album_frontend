@@ -32,8 +32,6 @@ export interface BackendPicture {
   reviewMessage?: string
   reviewerId?: string | number
   reviewTime?: string
-  picColor?: string
-  blurHash?: string
   viewCount?: number
   likeCount?: number
 }
@@ -83,11 +81,9 @@ export function mapBackendPictureToPhoto(picture: BackendPicture): Photo {
     category,
     categoryLabel: toPhotoCategoryLabel(category),
     summary: trimToUndefined(picture.introduction) ?? FALLBACK_SUMMARY,
-    location: trimToUndefined(picture.createTime) ?? "",
+    location: "",
     tags: normalizePictureTags(picture.tags),
     format: trimToUndefined(picture.picFormat)?.toUpperCase(),
-    dominantColor: trimToUndefined(picture.picColor),
-    blurHash: trimToUndefined(picture.blurHash),
     viewCount: picture.viewCount ?? 0,
     likeCount: picture.likeCount ?? 0,
     createdAt: trimToUndefined(picture.createTime),
@@ -95,5 +91,6 @@ export function mapBackendPictureToPhoto(picture: BackendPicture): Photo {
     reviewStatus: picture.reviewStatus,
     reviewMessage: trimToUndefined(picture.reviewMessage),
     userId: picture.userId !== undefined ? stringifyEntityId(picture.userId) : undefined,
+    userAvatar: trimToUndefined(picture.user?.userAvatar),
   }
 }

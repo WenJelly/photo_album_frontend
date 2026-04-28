@@ -7,10 +7,11 @@ import { preloadImage } from "@/lib/image-preload"
 import { PHOTO_CARD_TAG_LIMIT, getTagDisplay } from "@/lib/photo-tags"
 import { cn } from "@/lib/utils"
 import type { Photo } from "@/types/photo"
+import { toPhotoPreviewOriginRect, type PhotoPreviewOriginRect } from "@/types/photo-preview"
 
 interface PhotoGridProps {
   photos: Photo[]
-  onPhotoClick?: (photo: Photo) => void
+  onPhotoClick?: (photo: Photo, originRect?: PhotoPreviewOriginRect) => void
   onPhotographerClick?: (photo: Photo) => void
 }
 
@@ -152,7 +153,7 @@ const PhotoCard = memo(function PhotoCard({
   onPhotographerClick,
 }: {
   photo: Photo
-  onClick?: (photo: Photo) => void
+  onClick?: (photo: Photo, originRect?: PhotoPreviewOriginRect) => void
   onPhotographerClick?: (photo: Photo) => void
 }) {
   const { visibleTags, hiddenCount } = useMemo(
@@ -175,7 +176,7 @@ const PhotoCard = memo(function PhotoCard({
     >
       <button
         type="button"
-        onClick={() => onClick?.(photo)}
+        onClick={(event) => onClick?.(photo, toPhotoPreviewOriginRect(event.currentTarget.getBoundingClientRect()))}
         onMouseEnter={handleWarmPreview}
         onFocus={handleWarmPreview}
         className="absolute inset-0 z-10 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4"
@@ -187,8 +188,6 @@ const PhotoCard = memo(function PhotoCard({
         alt={photo.alt}
         width={photo.width}
         height={photo.height}
-        dominantColor={photo.dominantColor}
-        blurHash={photo.blurHash}
         imageClassName="group-hover:scale-[1.015]"
       />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/54 via-black/12 to-transparent px-4 pb-4 pt-14 opacity-0 transition duration-300 group-hover:opacity-100 group-focus-within:opacity-100">
