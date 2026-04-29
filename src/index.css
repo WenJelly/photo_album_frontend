@@ -186,6 +186,34 @@
   line-height: 1;
 }
 
+.profile-status-meter-track {
+  background:
+    linear-gradient(180deg, oklch(0.99 0.018 84 / 0.2), transparent 62%),
+    color-mix(in oklab, var(--secondary) 80%, white 20%);
+}
+
+.profile-status-meter-shine {
+  animation: profile-status-meter-shine 5.2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+@keyframes profile-status-meter-shine {
+  0% {
+    transform: translateX(-120%);
+  }
+
+  58%,
+  100% {
+    transform: translateX(340%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-status-meter-shine {
+    animation: none;
+    opacity: 0.35;
+  }
+}
+
 .dynamic-island-shell {
   --dynamic-island-logo-anchor-left: 0.75rem;
   --dynamic-island-logo-anchor-width: 2.25rem;
