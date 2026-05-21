@@ -2,23 +2,22 @@ import { startTransition, useCallback, useEffect, useMemo, useRef, useState } fr
 
 import { AdminReviewPage } from "@/components/AdminReviewPage"
 import { AuthDialog } from "@/components/AuthDialog"
-import { ExhibitionHeader } from "@/components/ExhibitionHeader"
 import { HeroIntro } from "@/components/HeroIntro"
+import { NavBar } from "@/components/NavBar"
+import type { NavRoute } from "@/components/NavBar"
 import { PhotoGrid } from "@/components/PhotoGrid"
 import { PhotoPreviewOverlay } from "@/components/PhotoPreviewOverlay"
 import { UploadDialog } from "@/components/UploadDialog"
 import { UserProfilePage } from "@/components/UserProfilePage"
 import { AuthProvider } from "@/contexts/AuthContext"
 import { useAuth } from "@/contexts/auth-context"
+import { TransitionProvider, usePageTransition } from "@/contexts/TransitionProvider"
 import { normalizeEntityId } from "@/lib/entity-id"
 import { preloadImage } from "@/lib/image-preload"
-import { getManualLogoutRedirectRoute } from "@/lib/manual-logout-route"
 import { DELETE_PICTURE_CONFIRM_MESSAGE } from "@/lib/picture-delete"
 import { canDeletePhoto } from "@/lib/photo-permissions"
 import { deletePicture, getPictureDetail, listPicturesCursor } from "@/lib/picture-api"
-import type { UploadProgressSnapshot } from "@/lib/upload-progress"
 import { cn } from "@/lib/utils"
-import type { IslandTask, UploadTaskEvent } from "@/types/island-task"
 import type { Photo } from "@/types/photo"
 import type { PhotoPreviewOriginRect } from "@/types/photo-preview"
 
@@ -29,7 +28,6 @@ type Route =
   | { page: "me" }
   | { page: "user"; userId: string }
 type GalleryLoadState = "idle" | "loading" | "ready" | "error"
-type HeaderVariant = "transparent" | "solid"
 
 const GALLERY_PATH = "/gallery"
 const ADMIN_REVIEW_PATH = "/admin/review"
@@ -37,40 +35,7 @@ const MY_PROFILE_PATH = "/me"
 const USER_PROFILE_PATH_PREFIX = "/users"
 const DEFAULT_GALLERY_ERROR = "Gallery is temporarily unavailable. Please try again later."
 const HOME_HEADER_OBSERVER_OFFSET_PX = 56
-const TASK_RESULT_LINGER_MS = 2600
-const UPLOAD_RESULT_LINGER_MS = 6500
-const UPLOAD_FAILURE_LINGER_MS = 5000
-const MAX_TASK_LOGS = 6
-const UPLOAD_TRANSFER_PROGRESS_CAP = 0.8
 const GALLERY_CURSOR_PAGE_SIZE = 30
-
-function appendTaskLog(logs: string[], nextLine: string) {
-  return [...logs, nextLine].slice(-MAX_TASK_LOGS)
-}
-
-function appendTaskLogIfChanged(logs: string[], nextLine: string) {
-  return logs.at(-1) === nextLine ? logs : appendTaskLog(logs, nextLine)
-}
-
-function formatBytes(value: number) {
-  if (!Number.isFinite(value) || value <= 0) {
-    return "0 B"
-  }
-
-  if (value >= 1024 * 1024) {
-    return `${(value / (1024 * 1024)).toFixed(1)} MB`
-  }
-
-  if (value >= 1024) {
-    return `${Math.round(value / 1024)} KB`
-  }
-
-  return `${Math.round(value)} B`
-}
-
-function createTaskId(prefix: string) {
-  return `${prefix}-${Date.now()}`
-}
 
 function getRouteFromPathname(pathname: string): Route {
   const normalizedPathname = pathname.replace(/\/+$/, "") || "/"
@@ -123,75 +88,13 @@ function getErrorMessage(error: unknown, fallbackMessage: string) {
   return error instanceof Error ? error.message : fallbackMessage
 }
 
-function formatUploadFailureSummary(message: string) {
-  return `上传未完成：${message}`
-}
-
-function clampTaskProgress(value: number) {
-  return Math.min(Math.max(value, 0), 1)
-}
-
-function isUploadTransferComplete(progress: UploadProgressSnapshot) {
-  if (typeof progress.total === "number" && progress.total > 0 && progress.loaded >= progress.total) {
-    return true
-  }
-
-  return typeof progress.progress === "number" && progress.progress >= 0.995
-}
-
-function getUploadTaskPresentation(progress: UploadProgressSnapshot) {
-  if (progress.progress === null) {
-    return {
-      phase: "transferring" as const,
-      progress: null,
-      title: "发送文件",
-      summary: `已发送 ${formatBytes(progress.loaded)}`,
-      logLine: null,
-      metric: undefined,
-    }
-  }
-
-  const normalizedProgress = clampTaskProgress(progress.progress)
-
-  if (isUploadTransferComplete(progress)) {
-    return {
-      phase: "processing" as const,
-      progress: null,
-      title: "服务器处理中",
-      summary: "文件已发送完成，正在等待服务器确认。",
-      logLine: "[server] processing upload",
-      metric: {
-        label: "阶段",
-        value: "处理中",
-      },
-    }
-  }
-
-  return {
-    phase: "transferring" as const,
-    progress: Math.min(normalizedProgress * UPLOAD_TRANSFER_PROGRESS_CAP, UPLOAD_TRANSFER_PROGRESS_CAP),
-    title: "发送文件",
-    summary: `已发送 ${formatBytes(progress.loaded)} / ${formatBytes(progress.total ?? 0)}`,
-    logLine: `[upload] ${Math.round(normalizedProgress * 100)}% @ ${formatBytes(progress.loaded)}`,
-    metric:
-      typeof progress.total === "number" && progress.total > 0
-        ? {
-            label: "文件",
-            value: `${formatBytes(progress.loaded)}/${formatBytes(progress.total)}`,
-          }
-        : undefined,
-  }
-}
-
 function AppShell() {
   const initialRoute = getRouteFromPathname(window.location.pathname)
-  const islandTaskHideTimeoutRef = useRef<number | null>(null)
   const pendingFocusPhotoIdRef = useRef<string | null>(null)
   const photoDetailCacheRef = useRef(new Map<string, Photo>())
   const homeHeroRef = useRef<HTMLElement | null>(null)
-  const stressDemoTimeoutsRef = useRef<number[]>([])
   const galleryMoreSentinelRef = useRef<HTMLDivElement | null>(null)
-  const { user, isLoggedIn, logout } = useAuth()
+  const { user, isLoggedIn } = useAuth()
 
   const [route, setRoute] = useState<Route>(initialRoute)
   const [galleryPhotos, setGalleryPhotos] = useState<Photo[]>([])
@@ -205,7 +108,6 @@ function AppShell() {
   const [galleryNotice, setGalleryNotice] = useState<string | null>(null)
   const [isHomeHeroVisible, setIsHomeHeroVisible] = useState(initialRoute.page === "home")
   const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false)
-  const [islandTask, setIslandTask] = useState<IslandTask | null>(null)
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false)
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null)
   const [selectedPhotoDetail, setSelectedPhotoDetail] = useState<Photo | null>(null)
@@ -217,9 +119,7 @@ function AppShell() {
   const currentPage = route.page
   const routeUserId = route.page === "user" ? route.userId : null
   const isHome = currentPage === "home"
-  const headerVariant: HeaderVariant = isHome && isHomeHeroVisible ? "transparent" : "solid"
   const isAdmin = user?.userRole === "admin"
-  const canRunStressDemo = Boolean((isLoggedIn && isAdmin) || import.meta.env.DEV)
   const selectedPhoto = useMemo(
     () => galleryPhotos.find((photo) => photo.id === selectedPhotoId) ?? null,
     [galleryPhotos, selectedPhotoId],
@@ -228,36 +128,6 @@ function AppShell() {
   const previewPhotos = selectedPhoto ? galleryPhotos : previewPhoto ? [previewPhoto] : galleryPhotos
   const canDeletePreviewPhoto = canDeletePhoto(user, previewPhoto)
   const shouldShowGrid = galleryPhotos.length > 0 || galleryLoadState === "ready"
-
-  const clearTaskHideTimeout = useCallback(() => {
-    if (islandTaskHideTimeoutRef.current !== null) {
-      window.clearTimeout(islandTaskHideTimeoutRef.current)
-      islandTaskHideTimeoutRef.current = null
-    }
-  }, [])
-
-  const clearStressDemoTimeouts = useCallback(() => {
-    for (const timeoutId of stressDemoTimeoutsRef.current) {
-      window.clearTimeout(timeoutId)
-    }
-
-    stressDemoTimeoutsRef.current = []
-  }, [])
-
-  const scheduleTaskDismiss = useCallback((delayMs = TASK_RESULT_LINGER_MS) => {
-    clearTaskHideTimeout()
-    islandTaskHideTimeoutRef.current = window.setTimeout(() => {
-      setIslandTask((currentTask) => (currentTask?.status === "running" ? currentTask : null))
-      islandTaskHideTimeoutRef.current = null
-    }, delayMs)
-  }, [clearTaskHideTimeout])
-
-  useEffect(() => {
-    return () => {
-      clearStressDemoTimeouts()
-      clearTaskHideTimeout()
-    }
-  }, [clearStressDemoTimeouts, clearTaskHideTimeout])
 
   const clearSelectedPhoto = useCallback(() => {
     setSelectedPhotoId(null)
@@ -340,18 +210,6 @@ function AppShell() {
     [navigateToRoute, user],
   )
 
-  const handleLogout = useCallback(() => {
-    const redirectPage = getManualLogoutRedirectRoute(currentPage)
-
-    setIsAuthDialogOpen(false)
-
-    if (redirectPage) {
-      navigateToRoute({ page: redirectPage }, { replace: true })
-    }
-
-    logout()
-  }, [currentPage, logout, navigateToRoute])
-
   const handlePhotographerNavigation = useCallback(
     (photo: Photo) => {
       if (photo.userId) {
@@ -359,6 +217,28 @@ function AppShell() {
       }
     },
     [navigateToUserPage],
+  )
+
+  const { startTransition: startPageTransition, reveal: revealPage, phase: transitionPhase } = usePageTransition()
+
+  const handleNavigateWithTransition = useCallback(
+    async (nextRoute: NavRoute, event: React.MouseEvent) => {
+      const currentPath = getPathFromRoute(route)
+      const nextPath = getPathFromRoute(nextRoute)
+
+      if (currentPath === nextPath) {
+        return
+      }
+
+      await startPageTransition()
+      navigateToRoute(nextRoute)
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          revealPage()
+        })
+      })
+    },
+    [navigateToRoute, revealPage, route, startPageTransition],
   )
 
   useEffect(() => {
@@ -620,200 +500,6 @@ function AppShell() {
     return () => observer.disconnect()
   }, [isHome])
 
-  const handleToggleTaskTerminal = useCallback(() => {
-    setIslandTask((currentTask) =>
-      currentTask
-        ? {
-            ...currentTask,
-            terminalOpen: !currentTask.terminalOpen,
-          }
-        : currentTask,
-    )
-  }, [])
-
-  const handleDismissTask = useCallback(() => {
-    clearTaskHideTimeout()
-    clearStressDemoTimeouts()
-    setIslandTask((currentTask) => (currentTask?.status === "running" ? currentTask : null))
-  }, [clearStressDemoTimeouts, clearTaskHideTimeout])
-
-  const handleUploadTaskEvent = useCallback(
-    (event: UploadTaskEvent) => {
-      clearTaskHideTimeout()
-      clearStressDemoTimeouts()
-
-      if (event.type === "start") {
-        setIsUploadDialogOpen(false)
-        setIslandTask({
-          id: createTaskId("upload"),
-          type: "upload",
-          phase: event.mode === "file" ? "transferring" : "processing",
-          status: "running",
-          title: event.mode === "file" ? "发送文件" : "服务器处理中",
-          summary: event.mode === "file" ? `准备上传 ${event.label}` : `正在导入 ${event.label}`,
-          progress: event.mode === "file" ? 0 : null,
-          logs: [
-            `[upload] task started`,
-            `[upload] source ${event.mode === "file" ? "file" : "url"} -> ${event.label}`,
-          ],
-          metric: {
-            label: "方式",
-            value: event.mode === "file" ? "本地文件" : "远程地址",
-          },
-          terminalOpen: false,
-        })
-        return
-      }
-
-      if (event.type === "progress") {
-        setIslandTask((currentTask) => {
-          if (!currentTask || currentTask.type !== "upload") {
-            return currentTask
-          }
-
-          const nextTaskPresentation = getUploadTaskPresentation(event.progress)
-
-          return {
-            ...currentTask,
-            phase: nextTaskPresentation.phase,
-            title: nextTaskPresentation.title,
-            progress: nextTaskPresentation.progress,
-            summary: nextTaskPresentation.summary,
-            logs: nextTaskPresentation.logLine
-              ? appendTaskLogIfChanged(currentTask.logs, nextTaskPresentation.logLine)
-              : currentTask.logs,
-            metric: nextTaskPresentation.metric ?? currentTask.metric,
-          }
-        })
-        return
-      }
-
-      if (event.type === "success") {
-        const isPublished = event.photo.reviewStatus === 1
-
-        setIslandTask((currentTask) => ({
-          id: currentTask?.id ?? createTaskId("upload"),
-          type: "upload",
-          phase: isPublished ? "published" : "pendingReview",
-          status: "success",
-          title: isPublished ? "已发布" : "等待审核",
-          summary: isPublished ? "作品已发布到图库。" : "作品已提交审核，通过后会出现在图库。",
-          progress: 1,
-          logs: appendTaskLog(
-            currentTask?.logs ?? [],
-            isPublished ? "[review] published to gallery" : "[review] pending moderation queue",
-          ),
-          metric: {
-            label: "结果",
-            value: isPublished ? "已发布" : "待审核",
-          },
-          previewPhoto: event.photo,
-          terminalOpen: currentTask?.terminalOpen ?? false,
-        }))
-        scheduleTaskDismiss(UPLOAD_RESULT_LINGER_MS)
-        return
-      }
-
-      setIslandTask((currentTask) => ({
-        id: currentTask?.id ?? createTaskId("upload"),
-        type: "upload",
-        phase: "failed",
-        status: "error",
-        title: "上传失败",
-        summary: formatUploadFailureSummary(event.message),
-        progress: null,
-        logs: appendTaskLog(currentTask?.logs ?? [], `[error] ${event.message}`),
-        metric: {
-          label: "状态",
-          value: "失败",
-        },
-        terminalOpen: currentTask?.terminalOpen ?? false,
-      }))
-      scheduleTaskDismiss(UPLOAD_FAILURE_LINGER_MS)
-    },
-    [clearStressDemoTimeouts, clearTaskHideTimeout, scheduleTaskDismiss],
-  )
-
-  const handleRunStressDemo = useCallback(() => {
-    clearTaskHideTimeout()
-    clearStressDemoTimeouts()
-
-    setIslandTask({
-      id: createTaskId("stress"),
-      type: "stress-demo",
-      status: "running",
-      title: "Pressure test / Demo",
-      summary: "Synthesizing pipeline load across the island console.",
-      progress: 0.08,
-      logs: ["[demo] priming synthetic workers", "[demo] warming cache lanes"],
-      metric: {
-        label: "Demo QPS",
-        value: "128/s",
-      },
-      terminalOpen: false,
-    })
-
-    const frames = [
-      {
-        delay: 260,
-        line: "[build] island control bus online",
-        metric: "214/s",
-        progress: 0.22,
-        summary: "Spawning synthetic workers.",
-      },
-      {
-        delay: 620,
-        line: "[kafka] topic.photo.review delta 11.7ms",
-        metric: "356/s",
-        progress: 0.46,
-        summary: "Sampling queue throughput.",
-      },
-      {
-        delay: 980,
-        line: "[audit] review pipeline green across 3 shards",
-        metric: "498/s",
-        progress: 0.72,
-        summary: "Replaying moderation events.",
-      },
-      {
-        delay: 1380,
-        line: "[qps] peak burst accepted without drops",
-        metric: "642/s",
-        progress: 1,
-        summary: "Demo run finished cleanly.",
-        status: "success" as const,
-      },
-    ]
-
-    stressDemoTimeoutsRef.current = frames.map((frame) =>
-      window.setTimeout(() => {
-        setIslandTask((currentTask) => {
-          if (!currentTask || currentTask.type !== "stress-demo") {
-            return currentTask
-          }
-
-          const nextTask: IslandTask = {
-            ...currentTask,
-            status: frame.status ?? "running",
-            progress: frame.progress,
-            summary: frame.summary,
-            logs: appendTaskLog(currentTask.logs, frame.line),
-            metric: {
-              label: "Demo QPS",
-              value: frame.metric,
-            },
-          }
-
-          return nextTask
-        })
-
-        if (frame.status === "success") {
-          scheduleTaskDismiss()
-        }
-      }, frame.delay),
-    )
-  }, [clearStressDemoTimeouts, clearTaskHideTimeout, scheduleTaskDismiss])
-
   const handleUploadSuccess = useCallback((photo: Photo) => {
     setGalleryNotice(
       photo.reviewStatus === 1
@@ -826,23 +512,6 @@ function AppShell() {
       requestGalleryLoad()
     }
   }, [clearSelectedPhoto, requestGalleryLoad])
-
-  const handlePreviewTaskPhoto = useCallback(() => {
-    const photo = islandTask?.type === "upload" ? islandTask.previewPhoto : undefined
-
-    if (!photo) {
-      return
-    }
-
-    clearSelectedPhoto()
-    photoDetailCacheRef.current.set(photo.id, photo)
-    setSelectedPhotoDetail(photo)
-    setSelectedPhotoError(null)
-    setSelectedPhotoOriginRect(null)
-    setIsPreviewLoading(false)
-    setSelectedPhotoId(photo.id)
-    preloadImage(photo.src)
-  }, [clearSelectedPhoto, islandTask])
 
   const handleDeletePreviewPhoto = useCallback(async () => {
     if (!previewPhoto) {
@@ -870,24 +539,17 @@ function AppShell() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
-      <ExhibitionHeader
-        canRunStressDemo={canRunStressDemo}
+      <NavBar
         currentPage={currentPage}
-        onDismissTask={handleDismissTask}
-        onHomeClick={() => navigateToRoute({ page: "home" })}
-        onGalleryClick={() => navigateToRoute({ page: "gallery" })}
-        onAdminReviewClick={() => navigateToRoute({ page: "adminReview" })}
+        isHomeHeroVisible={isHomeHeroVisible}
+        isAdmin={isAdmin}
+        isLoggedIn={isLoggedIn}
+        user={user}
+        onNavigate={handleNavigateWithTransition}
         onLoginClick={() => setIsAuthDialogOpen(true)}
-        onLogoutClick={handleLogout}
-        onMyProfileClick={() => navigateToRoute({ page: "me" })}
-        onPreviewTaskPhoto={handlePreviewTaskPhoto}
-        onRunStressDemo={handleRunStressDemo}
-        onToggleTaskTerminal={handleToggleTaskTerminal}
         onUploadClick={() => setIsUploadDialogOpen(true)}
-        task={islandTask}
-        variant={headerVariant}
       />
-      <main className={cn("flex-1", !isHome && "pt-24 md:pt-28")}>
+      <main className={cn("flex-1 page-transition", !isHome && "pt-24 md:pt-28")} data-phase={transitionPhase}>
         {isHome ? (
           <HeroIntro heroRef={homeHeroRef} />
         ) : currentPage === "adminReview" ? (
@@ -902,7 +564,7 @@ function AppShell() {
             onNavigateToUser={navigateToUserPage}
           />
         ) : (
-          <section className="mx-auto max-w-[1440px] px-4 pb-10 pt-4 md:px-6 md:pb-16 md:pt-6">
+          <section className="mx-auto max-w-[1440px] px-4 pb-16 pt-4 md:px-6 md:pb-16 md:pt-6">
             {galleryNotice ? (
               <div className="mb-4 rounded-[1.5rem] border border-emerald-500/16 bg-emerald-500/8 px-4 py-3 text-sm text-emerald-950/88">
                 {galleryNotice}
@@ -950,7 +612,6 @@ function AppShell() {
         <UploadDialog
           open={isUploadDialogOpen}
           onClose={() => setIsUploadDialogOpen(false)}
-          onUploadTaskEvent={handleUploadTaskEvent}
           onUploaded={handleUploadSuccess}
         />
       ) : null}
@@ -976,7 +637,9 @@ function AppShell() {
 function App() {
   return (
     <AuthProvider>
-      <AppShell />
+      <TransitionProvider>
+        <AppShell />
+      </TransitionProvider>
     </AuthProvider>
   )
 }

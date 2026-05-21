@@ -1,5 +1,14 @@
 export type PhotoCategory = string
 
+export interface PhotoExif {
+  aperture?: string
+  shutterSpeed?: string
+  iso?: number
+  focalLength?: string
+  camera?: string
+  lens?: string
+}
+
 export interface Photo {
   id: string
   src: string
@@ -22,4 +31,5 @@ export interface Photo {
   reviewMessage?: string
   userId?: string
   userAvatar?: string
+  exif?: PhotoExif
 }

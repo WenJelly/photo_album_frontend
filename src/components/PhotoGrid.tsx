@@ -171,7 +171,7 @@ const PhotoCard = memo(function PhotoCard({
 
   return (
     <article
-      className="group relative overflow-hidden rounded-[0.7rem] bg-muted/60"
+      className="group relative overflow-hidden rounded-[0.7rem] bg-muted/60 transition-transform duration-150 ease-out active:scale-[0.97]"
       style={{ flex: `${photo.width / photo.height} 0 0` }}
     >
       <button

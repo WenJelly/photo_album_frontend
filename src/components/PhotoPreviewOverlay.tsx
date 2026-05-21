@@ -1,11 +1,10 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight, Download } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
 import { preloadImages } from "@/lib/image-preload"
 import { PHOTO_DETAIL_TAG_LIMIT, getTagDisplay } from "@/lib/photo-tags"
 import { cn } from "@/lib/utils"
-import type { Photo } from "@/types/photo"
+import type { Photo, PhotoExif } from "@/types/photo"
 import type { PhotoPreviewOriginRect } from "@/types/photo-preview"
 
 interface PhotoPreviewOverlayProps {
@@ -24,58 +23,33 @@ interface PhotoPreviewOverlayProps {
 
 const DESKTOP_BREAKPOINT = 768
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)"
-const OPENING_TRANSITION_MS = 460
+const OPENING_TRANSITION_MS = 520
 
 function readMediaQueryMatch(query: string) {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
     return false
   }
-
   return window.matchMedia(query).matches
 }
 
 function getPreviewSrc(photo: Photo) {
-  return photo.src
-}
-
-function describeDimensions(photo: Photo) {
-  return `${photo.width} \u00d7 ${photo.height}`
+  return photo.thumbnailSrc ?? photo.src
 }
 
 function getPhotographerInitial(name: string) {
   return name.trim().charAt(0).toUpperCase() || "?"
 }
 
-const RAIL_COPY = {
-  format: "\u683c\u5f0f",
-  size: "\u5c3a\u5bf8",
-  uploaded: "\u4e0a\u4f20\u65f6\u95f4",
-  views: "\u6d4f\u89c8",
-  likes: "\u70b9\u8d5e",
-} as const
+const PLACEHOLDER_EXIF: PhotoExif = {
+  aperture: "f/2.8",
+  shutterSpeed: "1/250s",
+  iso: 400,
+  focalLength: "85mm",
+  camera: "Sony A7IV",
+  lens: "FE 85mm f/1.4 GM",
+}
 
-const railTextToneClassNames = {
-  eyebrow: "text-[rgba(45,52,68,0.58)]",
-  title: "text-[rgba(11,15,24,0.96)]",
-  body: "text-[rgba(31,38,52,0.82)]",
-  chip: "text-[rgba(41,48,64,0.76)]",
-  label: "text-[rgba(22,28,40,0.62)]",
-  value: "text-[rgba(11,15,24,0.88)]",
-  accent: "text-[rgba(9,12,20,0.96)]",
-  footerEyebrow: "text-[rgba(15,23,42,0.46)]",
-  footerPrimary: "text-[rgba(9,12,20,0.96)]",
-  footerDivider: "text-[rgba(15,23,42,0.32)]",
-  footerSecondary: "text-[rgba(15,23,42,0.8)]",
-} as const
-
-const railChipSurfaceClassName =
-  "rounded-full border border-[rgba(255,255,255,0.62)] bg-[rgba(255,255,255,0.52)] px-3 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]"
-const railHeroChipSurfaceClassName =
-  "rounded-full border border-[rgba(255,255,255,0.66)] bg-[rgba(255,255,255,0.62)] px-3 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]"
-const railAuthorAvatarClassName =
-  "flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[rgba(255,255,255,0.7)] bg-[rgba(255,255,255,0.66)] text-[rgba(18,24,38,0.84)] shadow-[0_12px_24px_rgba(15,23,42,0.08)]"
-const railDeleteButtonClassName =
-  "rounded-full border border-[rgba(214,106,120,0.18)] bg-[rgba(214,106,120,0.08)] px-3.5 text-[rgba(120,30,49,0.92)] shadow-none hover:bg-[rgba(214,106,120,0.14)] focus-visible:border-[rgba(214,106,120,0.3)] focus-visible:ring-[rgba(214,106,120,0.18)]"
+// PLACEHOLDER_CONTINUE
 
 export function PhotoPreviewOverlay({
   photo,
@@ -114,24 +88,14 @@ export function PhotoPreviewOverlay({
   const previousPhoto = currentIndex > 0 ? photos[currentIndex - 1] : null
   const nextPhoto = currentIndex >= 0 && currentIndex < photos.length - 1 ? photos[currentIndex + 1] : null
   const previewSrc = getPreviewSrc(displayedPhoto)
-  const categoryLabel = contentPhoto.categoryLabel ?? contentPhoto.category
   const { visibleTags, hiddenCount } = getTagDisplay(contentPhoto.tags, { maxVisible: PHOTO_DETAIL_TAG_LIMIT })
   const photographerInitial = getPhotographerInitial(contentPhoto.photographer)
-  const detailFacts = [
-    { id: "format", label: RAIL_COPY.format, value: contentPhoto.format ?? "-" },
-    { id: "size", label: RAIL_COPY.size, value: describeDimensions(contentPhoto) },
-    { id: "uploaded", label: RAIL_COPY.uploaded, value: contentPhoto.createdAt ?? "-" },
-  ]
-  const detailStats = [
-    { id: "views", label: RAIL_COPY.views, value: contentPhoto.viewCount ?? 0 },
-    { id: "likes", label: RAIL_COPY.likes, value: contentPhoto.likeCount ?? 0 },
-  ]
+  const exif = contentPhoto.exif ?? PLACEHOLDER_EXIF
 
   const revealRail = () => {
     if (railRevealFrameRef.current !== null) {
       window.cancelAnimationFrame(railRevealFrameRef.current)
     }
-
     railRevealFrameRef.current = window.requestAnimationFrame(() => {
       setIsRailVisible(true)
       railRevealFrameRef.current = null
@@ -146,38 +110,27 @@ export function PhotoPreviewOverlay({
   }
 
   useEffect(() => {
-    const handleResize = () => {
-      setIsDesktop(window.innerWidth >= DESKTOP_BREAKPOINT)
-    }
-
+    const handleResize = () => setIsDesktop(window.innerWidth >= DESKTOP_BREAKPOINT)
     window.addEventListener("resize", handleResize)
-
     return () => window.removeEventListener("resize", handleResize)
   }, [])
 
   useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-      return
-    }
-
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return
     const mediaQuery = window.matchMedia(REDUCED_MOTION_QUERY)
     const update = () => setPrefersReducedMotion(mediaQuery.matches)
-
     update()
-
     if (typeof mediaQuery.addEventListener === "function") {
       mediaQuery.addEventListener("change", update)
       return () => mediaQuery.removeEventListener("change", update)
     }
-
     mediaQuery.addListener(update)
     return () => mediaQuery.removeListener(update)
   }, [])
 
   useEffect(() => {
-    const frame = window.requestAnimationFrame(() => setIsBackdropEntered(true))
-
-    return () => window.cancelAnimationFrame(frame)
+    const timer = setTimeout(() => setIsBackdropEntered(true), 60)
+    return () => clearTimeout(timer)
   }, [])
 
   useLayoutEffect(() => {
@@ -186,15 +139,12 @@ export function PhotoPreviewOverlay({
       setIsStageAtRest(true)
       return
     }
-
     const finalRect = stageRef.current.getBoundingClientRect()
-
     if (!finalRect.width || !finalRect.height) {
       setOpeningTransform(null)
       setIsStageAtRest(true)
       return
     }
-
     const originCenterX = originRect.x + originRect.width / 2
     const originCenterY = originRect.y + originRect.height / 2
     const finalCenterX = finalRect.left + finalRect.width / 2
@@ -203,149 +153,81 @@ export function PhotoPreviewOverlay({
     const translateY = originCenterY - finalCenterY
     const scaleX = Math.max(originRect.width / finalRect.width, 0.16)
     const scaleY = Math.max(originRect.height / finalRect.height, 0.16)
-
-    setOpeningTransform(`translate3d(${translateX}px, ${translateY}px, 0) scale(${scaleX}, ${scaleY})`)
+    setOpeningTransform(`translate3d(${translateX}px, ${translateY}px, 0) scale(${scaleX}, ${scaleY}) rotateY(1.2deg)`)
     setIsStageAtRest(false)
     hasAnimatedFromOriginRef.current = true
-
-    const frame = window.requestAnimationFrame(() => {
-      setIsStageAtRest(true)
-    })
-
+    const frame = window.requestAnimationFrame(() => setIsStageAtRest(true))
     return () => window.cancelAnimationFrame(frame)
   }, [originRect, prefersReducedMotion])
 
   useEffect(() => {
-    if (photo.id === displayedPhotoState.id) {
-      return
-    }
-
+    if (photo.id === displayedPhotoState.id) return
     let isCancelled = false
     const token = transitionTokenRef.current + 1
     transitionTokenRef.current = token
-
     const preload = new Image()
     preload.decoding = "async"
-
     const finish = () => {
-      if (isCancelled || transitionTokenRef.current !== token) {
-        return
-      }
-
+      if (isCancelled || transitionTokenRef.current !== token) return
       if (railRevealFrameRef.current !== null) {
         window.cancelAnimationFrame(railRevealFrameRef.current)
         railRevealFrameRef.current = null
       }
-
       setDisplayedPhotoState(photo)
       setIsDisplayedImageReady(false)
       setIsRailVisible(false)
     }
-
     preload.onload = finish
     preload.onerror = finish
     preload.src = photo.src
-
     if (typeof preload.decode === "function") {
-      try {
-        void preload.decode().catch(() => undefined).finally(finish)
-      } catch {
-        finish()
-      }
+      try { void preload.decode().catch(() => undefined).finally(finish) } catch { finish() }
     }
-
-    return () => {
-      isCancelled = true
-      preload.onload = null
-      preload.onerror = null
-    }
+    return () => { isCancelled = true; preload.onload = null; preload.onerror = null }
   }, [displayedPhotoState.id, photo])
 
   useEffect(() => {
     const measureImageHeight = () => {
-      if (!imageRef.current) {
-        return
-      }
-
+      if (!imageRef.current) return
       const nextHeight = imageRef.current.getBoundingClientRect().height
       setImageHeight(nextHeight > 0 ? Math.round(nextHeight) : 0)
     }
-
     measureImageHeight()
-
-    if (!imageRef.current) {
-      return
-    }
-
-    const observer = new ResizeObserver(() => {
-      measureImageHeight()
-    })
-
+    if (!imageRef.current) return
+    const observer = new ResizeObserver(() => measureImageHeight())
     observer.observe(imageRef.current)
-
     return () => observer.disconnect()
   }, [displayedPhoto.id, isDesktop, isDisplayedImageReady])
 
   useEffect(() => {
-    if (isDisplayedImageReady) {
-      return
-    }
-
+    if (isDisplayedImageReady) return
     const imageElement = imageRef.current
-
-    if (!imageElement || !imageElement.complete || imageElement.naturalWidth <= 0) {
-      return
-    }
-
+    if (!imageElement || !imageElement.complete || imageElement.naturalWidth <= 0) return
     imageReadyFrameRef.current = window.requestAnimationFrame(() => {
       const nextHeight = imageRef.current?.getBoundingClientRect().height ?? 0
       setImageHeight(nextHeight > 0 ? Math.round(nextHeight) : 0)
       setIsDisplayedImageReady(true)
-      if (railRevealFrameRef.current !== null) {
-        window.cancelAnimationFrame(railRevealFrameRef.current)
-      }
-      railRevealFrameRef.current = window.requestAnimationFrame(() => {
-        setIsRailVisible(true)
-        railRevealFrameRef.current = null
-      })
+      if (railRevealFrameRef.current !== null) window.cancelAnimationFrame(railRevealFrameRef.current)
+      railRevealFrameRef.current = window.requestAnimationFrame(() => { setIsRailVisible(true); railRevealFrameRef.current = null })
       imageReadyFrameRef.current = null
     })
-
-    return () => {
-      if (imageReadyFrameRef.current !== null) {
-        window.cancelAnimationFrame(imageReadyFrameRef.current)
-        imageReadyFrameRef.current = null
-      }
-    }
+    return () => { if (imageReadyFrameRef.current !== null) { window.cancelAnimationFrame(imageReadyFrameRef.current); imageReadyFrameRef.current = null } }
   }, [displayedPhoto.id, isDisplayedImageReady])
 
-  useEffect(() => {
-    preloadImages([previewSrc, previousPhoto?.src, nextPhoto?.src])
-  }, [nextPhoto?.src, previousPhoto?.src, previewSrc])
+  useEffect(() => { preloadImages([previewSrc, previousPhoto?.src, nextPhoto?.src]) }, [nextPhoto?.src, previousPhoto?.src, previewSrc])
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose()
-      }
-      if (event.key === "ArrowLeft" && previousPhoto && !isPhotoTransitionPending) {
-        onSelect(previousPhoto)
-      }
-      if (event.key === "ArrowRight" && nextPhoto && !isPhotoTransitionPending) {
-        onSelect(nextPhoto)
-      }
+      if (event.key === "Escape") onClose()
+      if (event.key === "ArrowLeft" && previousPhoto && !isPhotoTransitionPending) onSelect(previousPhoto)
+      if (event.key === "ArrowRight" && nextPhoto && !isPhotoTransitionPending) onSelect(nextPhoto)
     }
-
     const previousOverflow = document.body.style.overflow
     const previousPaddingRight = document.body.style.paddingRight
     const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth
-
     document.addEventListener("keydown", handleKeyDown)
     document.body.style.overflow = "hidden"
-    if (scrollbarWidth > 0) {
-      document.body.style.paddingRight = `${scrollbarWidth}px`
-    }
-
+    if (scrollbarWidth > 0) document.body.style.paddingRight = `${scrollbarWidth}px`
     return () => {
       document.removeEventListener("keydown", handleKeyDown)
       document.body.style.overflow = previousOverflow
@@ -355,14 +237,19 @@ export function PhotoPreviewOverlay({
 
   useEffect(() => {
     return () => {
-      if (imageReadyFrameRef.current !== null) {
-        window.cancelAnimationFrame(imageReadyFrameRef.current)
-      }
-      if (railRevealFrameRef.current !== null) {
-        window.cancelAnimationFrame(railRevealFrameRef.current)
-      }
+      if (imageReadyFrameRef.current !== null) window.cancelAnimationFrame(imageReadyFrameRef.current)
+      if (railRevealFrameRef.current !== null) window.cancelAnimationFrame(railRevealFrameRef.current)
     }
   }, [])
+
+  const exifItems = [
+    { label: "光圈", value: exif.aperture },
+    { label: "快门", value: exif.shutterSpeed },
+    { label: "ISO", value: exif.iso?.toString() },
+    { label: "焦距", value: exif.focalLength },
+    { label: "相机", value: exif.camera },
+    { label: "镜头", value: exif.lens },
+  ].filter((item) => item.value)
 
   return (
     <div
@@ -380,40 +267,44 @@ export function PhotoPreviewOverlay({
             className="relative flex w-full max-w-[1600px] flex-col overflow-hidden rounded-[1.35rem] border border-white/14 bg-[linear-gradient(160deg,rgba(241,245,249,0.12),rgba(15,23,42,0.2))] shadow-[0_32px_90px_rgba(15,23,42,0.32)] md:w-fit md:max-w-[1620px] md:flex-row md:items-stretch"
             role="dialog"
             aria-modal="true"
-            aria-label="\u56fe\u7247\u9884\u89c8"
+            aria-label="图片预览"
             onClick={(event) => event.stopPropagation()}
             style={{
               opacity: isStageAtRest ? 1 : 0.78,
-              transform: !isStageAtRest && openingTransform ? openingTransform : "translate3d(0, 0, 0) scale(1)",
+              transform: !isStageAtRest && openingTransform ? openingTransform : "translate3d(0, 0, 0) scale(1) rotateY(0deg)",
               transformOrigin: "center center",
+              boxShadow: isStageAtRest
+                ? "0 32px 90px rgba(15,23,42,0.32)"
+                : "0 4px 16px rgba(15,23,42,0.12)",
               transition: prefersReducedMotion
                 ? "opacity 180ms ease-out"
-                : `transform ${OPENING_TRANSITION_MS}ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease-out`,
+                : `transform ${OPENING_TRANSITION_MS}ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease-out, box-shadow ${OPENING_TRANSITION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
             }}
           >
+            {/* Image area */}
             <div className="relative flex shrink-0 items-center justify-center">
-              {isDesktop ? (
+              {isDesktop && (
                 <button
                   type="button"
-                  aria-label="\u4e0a\u4e00\u5f20\u56fe\u7247"
+                  aria-label="上一张"
                   onClick={() => previousPhoto && !isPhotoTransitionPending && onSelect(previousPhoto)}
                   disabled={!previousPhoto || isPhotoTransitionPending}
                   className="absolute left-5 top-1/2 z-20 inline-flex -translate-y-1/2 rounded-full border border-white/14 bg-black/24 p-2.5 text-white transition hover:bg-black/36 disabled:cursor-default disabled:opacity-35"
                 >
                   <ChevronLeft className="size-5" />
                 </button>
-              ) : null}
-              {isDesktop ? (
+              )}
+              {isDesktop && (
                 <button
                   type="button"
-                  aria-label="\u4e0b\u4e00\u5f20\u56fe\u7247"
+                  aria-label="下一张"
                   onClick={() => nextPhoto && !isPhotoTransitionPending && onSelect(nextPhoto)}
                   disabled={!nextPhoto || isPhotoTransitionPending}
                   className="absolute right-5 top-1/2 z-20 inline-flex -translate-y-1/2 rounded-full border border-white/14 bg-black/24 p-2.5 text-white transition hover:bg-black/36 disabled:cursor-default disabled:opacity-35"
                 >
                   <ChevronRight className="size-5" />
                 </button>
-              ) : null}
+              )}
               <div className="relative overflow-hidden bg-[linear-gradient(160deg,rgba(241,245,249,0.12),rgba(15,23,42,0.2))]">
                 <img
                   ref={imageRef}
@@ -430,215 +321,217 @@ export function PhotoPreviewOverlay({
                     isDisplayedImageReady ? "scale-100 opacity-100 blur-0" : "scale-[1.02] opacity-0 blur-sm"
                   }`}
                 />
-                {!isDisplayedImageReady ? (
+                {!isDisplayedImageReady && (
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.14),transparent_55%),linear-gradient(180deg,rgba(255,255,255,0.06),rgba(15,23,42,0.22))]" />
-                ) : null}
-                {isPhotoTransitionPending ? (
-                  <div className="pointer-events-none absolute left-4 top-4 rounded-full border border-white/14 bg-black/18 px-3 py-1.5 text-[0.68rem] uppercase tracking-[0.18em] text-white/72 backdrop-blur-md">
-                    Loading next work
+                )}
+                {isPhotoTransitionPending && (
+                  <div className="pointer-events-none absolute left-4 top-4 rounded-full border border-white/14 bg-black/18 px-3 py-1.5 text-[0.68rem] tracking-[0.12em] text-white/72 backdrop-blur-md">
+                    加载中
                   </div>
-                ) : null}
+                )}
               </div>
             </div>
-            {isDisplayedImageReady ? (
+
+            {/* Info rail */}
+            {isDisplayedImageReady && (
               <aside
                 role="complementary"
-                className={`flex w-full shrink-0 flex-col justify-between overflow-y-auto border-t border-[rgba(255,255,255,0.52)] bg-[linear-gradient(180deg,rgba(255,255,255,0.78),rgba(247,249,252,0.62))] p-6 text-slate-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] backdrop-blur-[24px] transition-[opacity,transform] duration-300 md:w-[388px] md:border-l md:border-t-0 md:p-8 ${
-                  isRailVisible ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0"
-                }`}
+                className={cn(
+                  "flex w-full shrink-0 flex-col border-t border-white/50 bg-[linear-gradient(180deg,rgba(255,255,255,0.82),rgba(247,249,252,0.66))] p-5 text-slate-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] backdrop-blur-[24px] transition-[opacity,transform] duration-300 md:w-[400px] md:border-l md:border-t-0 md:p-7",
+                  isRailVisible ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0",
+                )}
                 style={isDesktop && imageHeight ? { height: `${imageHeight}px` } : undefined}
               >
-                <div className="space-y-9">
-                  <div className="space-y-5">
-                    <div
-                      className={cn(
-                        "flex flex-wrap items-center gap-2 text-[0.72rem] font-medium tracking-[0.08em]",
-                        railTextToneClassNames.eyebrow,
-                      )}
+                {/* Section 1: Core — title + photographer + like */}
+                <div className="space-y-4">
+                  <h3
+                    className="truncate text-[1.5rem] font-semibold leading-tight tracking-[-0.03em] text-[rgba(11,15,24,0.96)]"
+                    title={contentPhoto.alt}
+                  >
+                    {contentPhoto.alt}
+                  </h3>
+
+                  {contentPhoto.summary && (
+                    <p
+                      className="line-clamp-2 text-[0.88rem] leading-relaxed text-[rgba(31,38,52,0.76)]"
+                      title={contentPhoto.summary}
                     >
-                      <span className={railHeroChipSurfaceClassName}>
-                        {"\u5f53\u524d\u4f5c\u54c1"}
-                      </span>
-                      <span className={railChipSurfaceClassName}>
-                        {categoryLabel}
-                      </span>
-                    </div>
-                    <div className="space-y-3.5">
-                      <h3
-                        className={cn(
-                          "max-w-[11ch] text-[2.05rem] font-medium leading-[1.02] tracking-[-0.058em] md:text-[2.18rem]",
-                          railTextToneClassNames.title,
-                        )}
+                      {contentPhoto.summary}
+                    </p>
+                  )}
+
+                  <div className="flex items-center gap-3">
+                    <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/70 bg-white/60 text-[rgba(18,24,38,0.84)] shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
+                      {contentPhoto.userAvatar ? (
+                        <img src={contentPhoto.userAvatar} alt="" loading="lazy" decoding="async" className="size-full object-cover" />
+                      ) : (
+                        <span className="text-xs font-semibold">{photographerInitial}</span>
+                      )}
+                    </span>
+                    {onPhotographerClick && contentPhoto.userId ? (
+                      <button
+                        type="button"
+                        onClick={() => onPhotographerClick(contentPhoto)}
+                        className="truncate text-[0.88rem] font-medium text-[rgba(11,15,24,0.88)] transition hover:text-[rgba(58,73,130,0.92)]"
                       >
-                        {contentPhoto.alt}
-                      </h3>
-                      <p className={cn("max-w-[30ch] text-[0.95rem] leading-7", railTextToneClassNames.body)}>
-                        {contentPhoto.summary}
-                      </p>
-                    </div>
-
-                    {(visibleTags.length > 0 || hiddenCount > 0) && (
-                      <div className="flex flex-wrap gap-2">
-                        {visibleTags.map((tag) => (
-                          <span key={tag} className={cn(railChipSurfaceClassName, "text-[0.72rem] tracking-[0.12em]", railTextToneClassNames.chip)}>
-                            {tag}
-                          </span>
-                        ))}
-                        {hiddenCount > 0 ? (
-                          <span className={cn(railChipSurfaceClassName, "text-[0.72rem] tracking-[0.12em]", railTextToneClassNames.chip)}>
-                            +{hiddenCount}
-                          </span>
-                        ) : null}
-                      </div>
+                        {contentPhoto.photographer}
+                      </button>
+                    ) : (
+                      <span className="truncate text-[0.88rem] font-medium text-[rgba(11,15,24,0.88)]">
+                        {contentPhoto.photographer}
+                      </span>
                     )}
-                    {errorMessage ? (
-                      <p className="rounded-[1.25rem] border border-amber-500/24 bg-amber-500/10 px-4 py-3 text-sm text-amber-900">
-                        {errorMessage}
-                      </p>
-                    ) : null}
                   </div>
+                </div>
 
-                  <div data-testid="photo-info-flow" className="space-y-7">
-                    <div className="grid gap-5 sm:grid-cols-2 md:grid-cols-1">
-                      <dl className="space-y-2">
-                        <dt className={cn("text-[0.74rem] font-medium tracking-[0.06em]", railTextToneClassNames.label)}>
-                          {"\u6444\u5f71\u5e08"}
-                        </dt>
-                        <dd className="flex items-center gap-3">
-                          <span className={railAuthorAvatarClassName}>
-                            {contentPhoto.userAvatar ? (
-                              <img
-                                data-testid="photo-author-avatar-image"
-                                src={contentPhoto.userAvatar}
-                                alt=""
-                                loading="lazy"
-                                decoding="async"
-                                className="size-full object-cover"
-                              />
-                            ) : (
-                              <span
-                                data-testid="photo-author-avatar-fallback"
-                                className="text-sm font-semibold tracking-[0.02em]"
-                              >
-                                {photographerInitial}
-                              </span>
-                            )}
-                          </span>
-                          <div className="min-w-0 space-y-1">
-                            {onPhotographerClick && contentPhoto.userId ? (
-                              <button
-                                type="button"
-                                onClick={() => onPhotographerClick(contentPhoto)}
-                                className={cn(
-                                  "w-fit max-w-full text-left text-[1rem] font-medium tracking-[-0.02em] transition hover:text-[rgba(58,73,130,0.92)] focus-visible:outline-none focus-visible:underline",
-                                  railTextToneClassNames.title,
-                                )}
-                              >
-                                {contentPhoto.photographer}
-                              </button>
-                            ) : (
-                              <p className={cn("text-[1rem] font-medium tracking-[-0.02em]", railTextToneClassNames.title)}>
-                                {contentPhoto.photographer}
-                              </p>
-                            )}
-                          </div>
-                        </dd>
-                      </dl>
-                      <dl className="space-y-2">
-                        <dt className={cn("text-[0.74rem] font-medium tracking-[0.06em]", railTextToneClassNames.label)}>
-                          {"\u62cd\u6444\u5730\u70b9"}
-                        </dt>
-                        <dd className={cn("text-[0.96rem] leading-7", railTextToneClassNames.body)}>
-                          {contentPhoto.location || "\u5730\u70b9\u4fe1\u606f\u6682\u7f3a"}
-                        </dd>
-                      </dl>
-                    </div>
+                {/* Divider */}
+                <div className="my-5 h-px bg-[rgba(15,23,42,0.06)]" />
 
-                    <dl className={cn("space-y-3.5 text-sm leading-6", railTextToneClassNames.body)}>
-                      {detailFacts.map((fact) => (
-                        <div
-                          key={fact.id}
-                          className="grid grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] items-start gap-x-4"
-                        >
-                          <dt className={cn("text-[0.74rem] font-medium tracking-[0.04em]", railTextToneClassNames.value)}>
-                            {fact.label}
-                          </dt>
-                          <dd className={cn("text-right text-[0.98rem] leading-6", railTextToneClassNames.value)}>
-                            {fact.value}
-                          </dd>
-                        </div>
-                      ))}
-                    </dl>
-
-                    <div data-testid="photo-stats-row" className="grid gap-3 sm:grid-cols-2 sm:gap-x-6">
-                      {detailStats.map((stat) => (
-                        <dl
-                          key={stat.id}
-                          data-testid={`photo-stat-${stat.id}`}
-                          className="flex items-end justify-between gap-3"
-                        >
-                          <dt className={cn("text-[0.74rem] font-medium tracking-[0.04em]", railTextToneClassNames.value)}>
-                            {stat.label}
-                          </dt>
-                          <dd className={cn("tabular-nums text-[1.12rem] font-semibold tracking-[-0.02em]", railTextToneClassNames.accent)}>
-                            {stat.value}
+                {/* Section 2: EXIF */}
+                {exifItems.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="text-[0.7rem] font-medium tracking-[0.08em] text-[rgba(45,52,68,0.5)]">
+                      拍摄参数
+                    </h4>
+                    <div className="grid grid-cols-3 gap-x-3 gap-y-2.5">
+                      {exifItems.map((item) => (
+                        <dl key={item.label} className="min-w-0">
+                          <dt className="text-[0.66rem] text-[rgba(45,52,68,0.46)]">{item.label}</dt>
+                          <dd
+                            className="truncate text-[0.8rem] font-medium text-[rgba(11,15,24,0.82)]"
+                            title={item.value}
+                          >
+                            {item.value}
                           </dd>
                         </dl>
                       ))}
                     </div>
                   </div>
+                )}
+
+                {/* Divider */}
+                <div className="my-5 h-px bg-[rgba(15,23,42,0.06)]" />
+
+                {/* Section 3: Metadata */}
+                <div className="space-y-3">
+                  {(visibleTags.length > 0 || hiddenCount > 0) && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {visibleTags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="rounded-full border border-[rgba(255,255,255,0.6)] bg-[rgba(255,255,255,0.5)] px-2.5 py-1 text-[0.68rem] text-[rgba(41,48,64,0.72)]"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                      {hiddenCount > 0 && (
+                        <span className="rounded-full border border-[rgba(255,255,255,0.6)] bg-[rgba(255,255,255,0.5)] px-2.5 py-1 text-[0.68rem] text-[rgba(41,48,64,0.72)]">
+                          +{hiddenCount}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                    {contentPhoto.location && (
+                      <dl className="col-span-2 min-w-0">
+                        <dt className="text-[0.66rem] text-[rgba(45,52,68,0.46)]">地点</dt>
+                        <dd className="truncate text-[0.8rem] text-[rgba(11,15,24,0.78)]" title={contentPhoto.location}>
+                          {contentPhoto.location}
+                        </dd>
+                      </dl>
+                    )}
+                    <dl className="min-w-0">
+                      <dt className="text-[0.66rem] text-[rgba(45,52,68,0.46)]">尺寸</dt>
+                      <dd className="text-[0.8rem] tabular-nums text-[rgba(11,15,24,0.78)]">
+                        {contentPhoto.width} × {contentPhoto.height}
+                      </dd>
+                    </dl>
+                    {contentPhoto.format && (
+                      <dl className="min-w-0">
+                        <dt className="text-[0.66rem] text-[rgba(45,52,68,0.46)]">格式</dt>
+                        <dd className="text-[0.8rem] text-[rgba(11,15,24,0.78)]">{contentPhoto.format}</dd>
+                      </dl>
+                    )}
+                    {contentPhoto.createdAt && (
+                      <dl className="min-w-0">
+                        <dt className="text-[0.66rem] text-[rgba(45,52,68,0.46)]">上传</dt>
+                        <dd className="truncate text-[0.8rem] text-[rgba(11,15,24,0.78)]" title={contentPhoto.createdAt}>
+                          {contentPhoto.createdAt}
+                        </dd>
+                      </dl>
+                    )}
+                    <dl className="min-w-0">
+                      <dt className="text-[0.66rem] text-[rgba(45,52,68,0.46)]">浏览</dt>
+                      <dd className="text-[0.8rem] tabular-nums text-[rgba(11,15,24,0.78)]">
+                        {contentPhoto.viewCount ?? 0}
+                      </dd>
+                    </dl>
+                  </div>
                 </div>
 
-                <div className="mt-10 space-y-4 pt-3">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
-                      <span className={cn("text-[0.68rem] uppercase tracking-[0.16em]", railTextToneClassNames.footerEyebrow)}>
-                        {"\u5f53\u524d\u67e5\u770b"}
-                      </span>
-                      <span className={cn("font-medium", railTextToneClassNames.footerPrimary)}>{"\u7b2c "}{currentIndex + 1}{" \u5f20"}</span>
-                      <span className={railTextToneClassNames.footerDivider}>/</span>
-                      <span className={railTextToneClassNames.footerSecondary}>{"\u5171 "}{photos.length}{" \u5f20"}</span>
+                {/* Footer */}
+                <div className="mt-auto pt-5">
+                  {errorMessage && (
+                    <p className="mb-3 rounded-xl border border-amber-500/24 bg-amber-500/10 px-3 py-2 text-[0.78rem] text-amber-900">
+                      {errorMessage}
                     </p>
-                    <div className="flex items-center gap-3">
-                      {isLoading ? <p className={cn("text-sm", railTextToneClassNames.footerSecondary)}>{"\u6b63\u5728\u5237\u65b0\u8be6\u60c5"}</p> : null}
-                      {canDelete ? (
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          className={railDeleteButtonClassName}
+                  )}
+                  <div className="flex items-center justify-between">
+                    <span className="text-[0.72rem] tabular-nums text-[rgba(15,23,42,0.44)]">
+                      {currentIndex + 1} / {photos.length}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {isLoading && <span className="text-[0.72rem] text-[rgba(15,23,42,0.5)]">刷新中</span>}
+                      <a
+                        href={contentPhoto.src}
+                        download
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex h-7 items-center gap-1.5 rounded-md border border-[rgba(15,23,42,0.08)] bg-[rgba(15,23,42,0.03)] px-2.5 text-[0.72rem] font-medium text-[rgba(15,23,42,0.64)] transition hover:border-[rgba(15,23,42,0.14)] hover:bg-[rgba(15,23,42,0.06)] hover:text-[rgba(15,23,42,0.82)]"
+                        aria-label="下载原图"
+                      >
+                        <Download className="size-3.5" />
+                        原图
+                      </a>
+                      {canDelete && (
+                        <button
+                          type="button"
                           onClick={onDelete}
                           disabled={isDeleting}
+                          className="inline-flex h-7 items-center rounded-md border border-[rgba(15,23,42,0.08)] bg-[rgba(15,23,42,0.03)] px-2.5 text-[0.72rem] font-medium text-[rgba(15,23,42,0.64)] transition hover:border-[rgba(220,38,38,0.2)] hover:bg-[rgba(220,38,38,0.04)] hover:text-[rgba(220,38,38,0.8)] disabled:opacity-40 disabled:pointer-events-none"
                         >
-                          {"\u5220\u9664\u4f5c\u54c1"}
-                        </Button>
-                      ) : null}
+                          删除
+                        </button>
+                      )}
                     </div>
                   </div>
-                  {!isDesktop ? (
-                    <div className="grid grid-cols-2 gap-3">
-                      <Button
-                        variant="secondary"
+                  {!isDesktop && (
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
                         onClick={() => previousPhoto && !isPhotoTransitionPending && onSelect(previousPhoto)}
                         disabled={!previousPhoto || isPhotoTransitionPending}
+                        className="inline-flex h-8 items-center justify-center rounded-md border border-[rgba(15,23,42,0.08)] bg-[rgba(15,23,42,0.03)] text-[0.78rem] font-medium text-[rgba(15,23,42,0.7)] transition hover:bg-[rgba(15,23,42,0.06)] disabled:opacity-35 disabled:pointer-events-none"
                       >
-                        {"\u4e0a\u4e00\u5f20"}
-                      </Button>
-                      <Button
-                        variant="secondary"
+                        上一张
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => nextPhoto && !isPhotoTransitionPending && onSelect(nextPhoto)}
                         disabled={!nextPhoto || isPhotoTransitionPending}
+                        className="inline-flex h-8 items-center justify-center rounded-md border border-[rgba(15,23,42,0.08)] bg-[rgba(15,23,42,0.03)] text-[0.78rem] font-medium text-[rgba(15,23,42,0.7)] transition hover:bg-[rgba(15,23,42,0.06)] disabled:opacity-35 disabled:pointer-events-none"
                       >
-                        {"\u4e0b\u4e00\u5f20"}
-                      </Button>
+                        下一张
+                      </button>
                     </div>
-                  ) : null}
+                  )}
                 </div>
               </aside>
-            ) : null}
+            )}
           </div>
         </div>
       </div>
     </div>
   )
 }
-
