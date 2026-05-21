@@ -186,6 +186,81 @@
   line-height: 1;
 }
 
+.admin-review-waterglass {
+  --admin-review-glass-border: oklch(0.9 0.032 270 / 0.5);
+  --admin-review-glass-surface: oklch(0.985 0.006 84 / 0.66);
+  --admin-review-glass-sheen: oklch(1 0 0 / 0.52);
+  --admin-review-glass-tint: oklch(0.98 0.006 220 / 0.28);
+  --admin-review-glass-shadow: oklch(0.37 0.03 245 / 0.08);
+  --admin-review-glass-quiet-surface: oklch(0.982 0.004 84 / 0.5);
+  --admin-review-glass-quiet-sheen: oklch(1 0 0 / 0.34);
+  --admin-review-glass-quiet-tint: oklch(0.985 0.004 220 / 0.2);
+  --admin-review-glass-backdrop-a: oklch(0.98 0.01 210 / 0.5);
+  --admin-review-glass-backdrop-b: oklch(0.96 0.012 250 / 0.38);
+  --admin-review-glass-backdrop-base-from: oklch(0.992 0.005 84 / 0.86);
+  --admin-review-glass-backdrop-base-to: oklch(0.968 0.006 94 / 0.92);
+  position: relative;
+  isolation: isolate;
+}
+
+.admin-review-waterglass::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(132deg, var(--admin-review-glass-backdrop-a), transparent 38%),
+    linear-gradient(24deg, transparent 46%, var(--admin-review-glass-backdrop-b) 72%, transparent 100%),
+    linear-gradient(
+      180deg,
+      var(--admin-review-glass-backdrop-base-from),
+      var(--admin-review-glass-backdrop-base-to)
+    );
+}
+
+.admin-review-glass-panel,
+.admin-review-glass-card,
+.admin-review-glass-field,
+.admin-review-glass-chip {
+  border: 1px solid var(--admin-review-glass-border);
+  background:
+    linear-gradient(180deg, var(--admin-review-glass-sheen), var(--admin-review-glass-tint)),
+    var(--admin-review-glass-surface);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.62),
+    0 18px 42px var(--admin-review-glass-shadow);
+  backdrop-filter: blur(18px) saturate(132%);
+}
+
+.admin-review-glass-panel {
+  border-radius: 1.4rem;
+}
+
+.admin-review-glass-card {
+  border-radius: 1.15rem;
+}
+
+.admin-review-glass-field {
+  border-radius: 0.9rem;
+}
+
+.admin-review-glass-chip {
+  border-radius: 9999px;
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.56),
+    0 10px 24px oklch(0.37 0.03 245 / 0.055);
+}
+
+.admin-review-glass-panel--quiet {
+  background:
+    linear-gradient(180deg, var(--admin-review-glass-quiet-sheen), var(--admin-review-glass-quiet-tint)),
+    var(--admin-review-glass-quiet-surface);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.48),
+    0 12px 30px var(--admin-review-glass-shadow);
+}
+
 .profile-status-meter-track {
   background:
     linear-gradient(180deg, oklch(0.99 0.018 84 / 0.2), transparent 62%),
